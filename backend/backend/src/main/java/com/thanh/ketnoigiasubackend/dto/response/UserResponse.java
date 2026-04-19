@@ -1,6 +1,5 @@
 package com.thanh.ketnoigiasubackend.dto.response;
 
-import com.thanh.ketnoigiasubackend.enums.Role;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,6 +15,5 @@ public class UserResponse {
     private String email;
     private String fullName;
     private String phone;
-    private Role role;
-    private boolean enabled;
+    private String role;
 }

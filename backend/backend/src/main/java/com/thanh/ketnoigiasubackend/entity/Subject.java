@@ -17,5 +17,5 @@ public class Subject {
     private Long id;
 
     @Column(nullable = false, unique = true, length = 100)
-    private String name;   // Toán, Lý, Anh văn, IELTS...
+    private String name;
 }

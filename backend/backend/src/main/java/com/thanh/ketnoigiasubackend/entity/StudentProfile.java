@@ -6,7 +6,11 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "student_profiles")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class StudentProfile {
 
     @Id
@@ -17,7 +21,10 @@ public class StudentProfile {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
+    private String address;
     private String gradeLevel;
+
+    @Column(columnDefinition = "TEXT")
     private String learningGoals;
 
     private LocalDateTime createdAt;

@@ -2,11 +2,17 @@ package com.thanh.ketnoigiasubackend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tutor_profiles")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class TutorProfile {
 
     @Id
@@ -17,14 +23,24 @@ public class TutorProfile {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    private String bio;
-    private String videoIntroUrl;
+    private String gender;
+    private LocalDate dateOfBirth;
+    private String cccd;
+    private String cccdIssuedPlace;
     private String address;
-    private String district;
+    private String school;
+    private String major;
+    private Integer graduationYear;
+    private String currentOccupation;
 
-    private Double ratingAvg = 0.0;
+    @Column(columnDefinition = "TEXT")
+    private String strengths;
 
-    private Integer totalReviews = 0;
+    @Column(columnDefinition = "TEXT")
+    private String subjects;
+
+    @Column(columnDefinition = "TEXT")
+    private String grades;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

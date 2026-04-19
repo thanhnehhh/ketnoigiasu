@@ -27,7 +27,7 @@ public class Enrollment {
     private Course course;
 
     @Column(nullable = false)
-    private Double finalPricePerSession;   // Giá sau khi áp dụng phí nền tảng
+    private Double finalPricePerSession;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

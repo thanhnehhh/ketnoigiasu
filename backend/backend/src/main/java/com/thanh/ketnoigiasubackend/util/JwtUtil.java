@@ -21,7 +21,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secretKeyString.getBytes());
     }
 
-    // Tạo JWT Token
+    // Tạo JWT Token (3 tham số)
     public String generateToken(String email, String role, Long userId) {
         return Jwts.builder()
                 .subject(email)
@@ -33,7 +33,6 @@ public class JwtUtil {
                 .compact();
     }
 
-    // Lấy email từ token
     public String extractEmail(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
@@ -43,7 +42,6 @@ public class JwtUtil {
                 .getSubject();
     }
 
-    // Lấy role từ token
     public String extractRole(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
@@ -53,7 +51,6 @@ public class JwtUtil {
                 .get("role", String.class);
     }
 
-    // Lấy userId từ token
     public Long extractUserId(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
@@ -63,7 +60,6 @@ public class JwtUtil {
                 .get("userId", Long.class);
     }
 
-    // Kiểm tra token hợp lệ
     public boolean isTokenValid(String token) {
         try {
             Jwts.parser()
