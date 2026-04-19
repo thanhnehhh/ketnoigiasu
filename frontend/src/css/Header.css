@@ -1,0 +1,131 @@
+/* ===== HEADER CORE ===== */
+.header {
+    background: white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.header-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0.8rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.logo-icon {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: bold;
+}
+.logo h1 { font-size: 1.4rem; font-weight: 700; color: #1f2937; margin: 0; }
+
+.main-nav { display: flex; gap: 2rem; }
+.main-nav a { color: #4b5563; font-weight: 500; text-decoration: none; transition: 0.2s; }
+.main-nav a:hover { color: #4f46e5; }
+
+/* ===== NÚT BẤM BẰNG NHAU ===== */
+.auth-buttons {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.btn-login, .btn-register, .btn-logout {
+    width: 120px;            /* Chiều rộng bằng nhau */
+    height: 42px;           /* Chiều cao bằng nhau */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-size: 0.95rem;
+    transition: 0.25s;
+    cursor: pointer;
+    text-decoration: none;
+    box-sizing: border-box;
+}
+
+.btn-login {
+    color: #4f46e5;
+    border: 1.5px solid #4f46e5;
+    background: transparent;
+    font-weight: 500;
+}
+.btn-login:hover { background: #f5f3ff; }
+
+.btn-register {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white;
+    font-weight: 600;
+    border: none;
+}
+
+.btn-logout {
+    color: #ef4444;
+    border: 1.5px solid #ef4444;
+    font-weight: 500;
+}
+
+/* ===== FIX DROPDOWN HOVER ===== */
+.register-dropdown {
+    position: relative;
+    display: inline-block; /* Quan trọng: Giữ khung bọc sát nút */
+}
+
+/* Tạo lớp phủ vô hình để chuột rê từ nút xuống menu không bị mất hover */
+.register-dropdown::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: -20px; /* Kéo dài vùng hover xuống dưới nút */
+    z-index: 1;
+}
+
+.btn-register {
+    position: relative;
+    z-index: 2; /* Nổi lên trên lớp đệm */
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 10px); /* Cách nút một khoảng nhỏ cho đẹp */
+    right: 0;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    min-width: 220px;
+    padding: 8px 0;
+    z-index: 1100;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-item {
+    display: block;
+    padding: 12px 20px;
+    color: #374151;
+    text-decoration: none;
+    font-weight: 500;
+    transition: 0.2s;
+    position: relative;
+    z-index: 1101;
+}
+
+.dropdown-item:hover {
+    background: #f3f4f6;
+    color: #4f46e5;
+}
+
+.welcome-msg { margin-right: 15px; color: #374151; }

@@ -28,23 +28,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
 
-        String token = getJwtFromRequest(request);
+        String requestURI = request.getRequestURI();
 
-        if (StringUtils.hasText(token) && jwtUtil.isTokenValid(token)) {
-            String email = jwtUtil.extractEmail(token);
+        // BỎ QUA HOÀN TOÀN tất cả endpoint liên quan đến Auth và OTP
+        if (requestURI.startsWith("/api/auth/") ||
+                requestURI.startsWith("/api/otp/")) {
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        // Chỉ các request khác mới kiểm tra JWT
+        String header = request.getHeader("Authorization");
 
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        if (header != null && header.startsWith("Bearer ")) {
+            String token = header.substring(7);
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            try {
+                if (jwtUtil.isTokenValid(token)) {
+                    String email = jwtUtil.extractEmail(token);
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(email, null, null);
+
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            } catch (Exception e) {
+                // Không throw, chỉ log warning
+                System.out.println("JWT validation failed: " + e.getMessage());
+            }
         }
 
         filterChain.doFilter(request, response);

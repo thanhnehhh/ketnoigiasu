@@ -1,23 +1,20 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import RegisterStudent from './pages/RegisterStudent';
+import RegisterTutor from './pages/RegisterTutor';
 
 function App() {
-  return (
-      <Router>
-        <Routes>
-          {/* Trang chủ */}
-          <Route path="/" element={<Home />} />
-
-          {/* Trang đăng nhập */}
-          <Route path="/login" element={<Login />} />
-
-          {/* Các trang khác sẽ thêm sau */}
-          {/* <Route path="/register" element={<Register />} /> */}
-          {/* <Route path="/search" element={<Search />} /> */}
-        </Routes>
-      </Router>
-  );
+    return (
+        <Router>
+            <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register/student" element={<RegisterStudent />} />
+                <Route path="/register/tutor" element={<RegisterTutor />} />
+            </Routes>
+        </Router>
+    );
 }
 
 export default App;

@@ -20,7 +20,7 @@ public class Payment {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
-    private User user;                    // Người thanh toán (học viên)
+    private User user;
 
     @ManyToOne
     @JoinColumn(name = "enrollment_id")
@@ -30,18 +30,18 @@ public class Payment {
     private Double amount;
 
     @Column(nullable = false)
-    private String paymentType;           // "TUITION" hoặc "OTHER"
+    private String paymentType;
 
-    private String proofImageUrl;         // Đường dẫn ảnh biên lai
+    private String proofImageUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentStatus status = PaymentStatus.PENDING_VERIFY;
 
-    private String transactionCode;       // Mã chuyển khoản tự sinh
+    private String transactionCode;
 
     private LocalDateTime createdAt;
-    private LocalDateTime verifiedAt;     // Thời gian admin duyệt
+    private LocalDateTime verifiedAt;
 
     @PrePersist
     protected void onCreate() {

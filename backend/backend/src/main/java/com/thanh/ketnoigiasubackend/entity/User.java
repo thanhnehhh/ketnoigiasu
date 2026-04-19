@@ -31,7 +31,7 @@ public class User {
     private String avatar;
 
     @Column(nullable = false)
-    private boolean enabled = true;
+    private boolean enabled = false;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

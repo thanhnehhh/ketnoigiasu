@@ -26,7 +26,7 @@ public class Review {
     private StudentProfile student;
 
     @Column(nullable = false)
-    private Integer rating;           // 1 đến 5 sao
+    private Integer rating;
 
     @Column(columnDefinition = "TEXT")
     private String comment;

@@ -1,0 +1,38 @@
+.footer {
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    padding: 3rem 0 2rem;
+    margin-top: 4rem;
+}
+
+.footer-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    text-align: center;
+}
+
+.footer-logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+}
+
+.footer-links a {
+    margin: 0 1rem;
+    color: #6b7280;
+    text-decoration: none;
+}
+
+.footer-links a:hover {
+    color: #4f46e5;
+}
+
+.footer-copyright {
+    margin-top: 2rem;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}
