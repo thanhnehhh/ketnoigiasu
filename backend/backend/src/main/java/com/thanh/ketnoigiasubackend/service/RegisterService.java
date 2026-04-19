@@ -94,14 +94,14 @@ public class RegisterService {
 
     @Transactional
     public void setupFinalPassword(String email, String password) {
-        if (password == null || password.length() < 6 || !password.matches(".*[!@#$%^&*()].*")) {
-            throw new RuntimeException("Mật khẩu không đạt yêu cầu bảo mật!");
-        }
-
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-        // 2. Mã hóa mật khẩu thật và kích hoạt tài khoản
+        // Validation mật khẩu (có thể thêm regex mạnh hơn sau)
+        if (password == null || password.length() < 6) {
+            throw new RuntimeException("Mật khẩu phải có ít nhất 6 ký tự!");
+        }
+
         user.setPassword(passwordEncoder.encode(password));
         user.setEnabled(true);
         userRepository.save(user);
