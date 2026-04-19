@@ -3,8 +3,8 @@ package com.thanh.ketnoigiasubackend.dto.request;
 import lombok.Data;
 
 @Data
-public class VerifyOtpRequest {
+public class ResetPasswordRequest {
     private String email;
     private String otp;
-    private String role;
+    private String newPassword;
 }

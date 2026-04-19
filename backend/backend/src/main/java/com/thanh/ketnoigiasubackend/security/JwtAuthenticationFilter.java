@@ -33,15 +33,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String requestURI = request.getRequestURI();
 
-        // BỎ QUA HOÀN TOÀN tất cả endpoint liên quan đến Auth và OTP
-        if (requestURI.startsWith("/api/auth/") ||
-                requestURI.startsWith("/api/otp/")) {
+        // Chỉ bỏ qua các endpoint KHÔNG cần token
+        if (requestURI.equals("/api/auth/login") ||
+                requestURI.equals("/api/auth/forgot-password") ||
+                requestURI.startsWith("/api/otp/") ||                    // giữ nguyên cho OTP
+                requestURI.startsWith("/api/auth/register/")) {         // nếu có register
 
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Chỉ các request khác mới kiểm tra JWT
+        // Các endpoint cần auth (change-password, me, logout, v.v.) mới kiểm tra token
         String header = request.getHeader("Authorization");
 
         if (header != null && header.startsWith("Bearer ")) {
@@ -50,6 +52,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 if (jwtUtil.isTokenValid(token)) {
                     String email = jwtUtil.extractEmail(token);
+
+                    // Tạo authentication (có thể load đầy đủ authorities sau nếu cần)
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(email, null, null);
 
@@ -57,8 +61,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             } catch (Exception e) {
-                // Không throw, chỉ log warning
                 System.out.println("JWT validation failed: " + e.getMessage());
+                // Không throw exception để tránh block request
             }
         }
 
