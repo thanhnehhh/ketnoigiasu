@@ -38,7 +38,6 @@ public class OtpController {
                         .body(new AuthResponse(null, "Email không hợp lệ! Vui lòng kiểm tra lại."));
             }
 
-            // Kiểm tra email đã tồn tại trong database chưa
             if (userRepository.existsByEmail(request.getEmail())) {
                 return ResponseEntity.badRequest()
                         .body(new AuthResponse(null, "Email này đã được sử dụng để đăng ký. Vui lòng dùng email khác!"));
@@ -46,7 +45,6 @@ public class OtpController {
 
             String otp = otpService.generateOtp(request.getEmail());
 
-            // Gửi mail - nếu fail sẽ throw exception
             emailService.sendOtpEmail(request.getEmail(), otp);
 
             return ResponseEntity.ok(new AuthResponse(null,
@@ -54,7 +52,6 @@ public class OtpController {
                             "Nếu bạn không nhận được mail trong vài phút, vui lòng kiểm tra thư mục Spam hoặc địa chỉ email."));
 
         } catch (RuntimeException e) {
-            // Lỗi từ EmailService (email sai, Gmail từ chối, không kết nối được...)
             return ResponseEntity.badRequest()
                     .body(new AuthResponse(null, e.getMessage()));
         } catch (Exception e) {
@@ -64,7 +61,6 @@ public class OtpController {
         }
     }
 
-    // ====================== VERIFY + REGISTER STUDENT ======================
     @PostMapping("/verify/student")
     public ResponseEntity<AuthResponse> verifyOtpAndRegisterStudent(@RequestBody VerifyOtpAndRegisterStudentRequest request) {
         try {
@@ -100,7 +96,7 @@ public class OtpController {
             }
             request.getRegisterData().setEmail(request.getEmail());
 
-            // 4. Đăng ký User + Profile (chỉ thực hiện khi tất cả validation OK)
+            // 4. Đăng ký User + Profile
             User user = registerService.registerStudent(request.getRegisterData());
 
             // 5. Thiết lập mật khẩu và kích hoạt
@@ -118,7 +114,6 @@ public class OtpController {
         }
     }
 
-    // ====================== VERIFY + REGISTER TUTOR ======================
     @PostMapping("/verify/tutor")
     public ResponseEntity<AuthResponse> verifyOtpAndRegisterTutor(@RequestBody VerifyOtpAndRegisterTutorRequest request) {
         try {
@@ -150,13 +145,12 @@ public class OtpController {
                         .body(new AuthResponse(null, "Mật khẩu phải có ít nhất 6 ký tự!"));
             }
 
-            // 3. KIỂM TRA VÀ ĐỒNG BỘ EMAIL (RẤT QUAN TRỌNG - Đây là lỗi hiện tại)
+            // 3. KIỂM TRA VÀ ĐỒNG BỘ EMAIL
             if (request.getRegisterData() == null) {
                 return ResponseEntity.badRequest()
                         .body(new AuthResponse(null, "Dữ liệu đăng ký không được để trống!"));
             }
 
-            // ←←← THÊM DÒNG NÀY ←←←
             request.getRegisterData().setEmail(request.getEmail());
 
             // 4. Đăng ký thông tin Gia sư
@@ -181,7 +175,6 @@ public class OtpController {
         String emailRegex = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
         return email != null && email.matches(emailRegex);
     }
-    // ==================== QUÊN MẬT KHẨU - GỬI OTP ====================
     @PostMapping("/forgot-password/send")
     public ResponseEntity<AuthResponse> forgotPasswordSendOtp(@RequestBody ForgotPasswordRequest request) {
         try {
@@ -197,7 +190,6 @@ public class OtpController {
         }
     }
 
-    // ==================== QUÊN MẬT KHẨU - ĐẶT LẠI MẬT KHẨU ====================
     @PostMapping("/forgot-password/reset")
     public ResponseEntity<AuthResponse> forgotPasswordReset(@RequestBody ResetPasswordRequest request) {
         try {

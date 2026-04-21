@@ -70,7 +70,6 @@ public class AuthService {
         return new AuthResponse(null, "Đăng xuất thành công!");
     }
 
-    // ====================== QUÊN MẬT KHẨU - GỬI OTP ======================
     public AuthResponse forgotPassword(ForgotPasswordRequest request) {
         if (!userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email này chưa được đăng ký trong hệ thống!");
@@ -79,7 +78,6 @@ public class AuthService {
         return new AuthResponse(null, "Mã OTP để đặt lại mật khẩu đã được gửi đến email của bạn.");
     }
 
-    // ====================== QUÊN MẬT KHẨU - ĐẶT LẠI MẬT KHẨU ======================
     public AuthResponse resetPassword(ResetPasswordRequest request) {
         boolean isValidOtp = otpService.verifyOtp(request.getEmail(), request.getOtp());
         if (!isValidOtp) {
@@ -105,12 +103,10 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản!"));
 
-        // Kiểm tra mật khẩu hiện tại có đúng không
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new RuntimeException("Mật khẩu hiện tại không đúng!");
         }
 
-        // Kiểm tra mật khẩu mới
         if (request.getNewPassword() == null || request.getNewPassword().trim().length() < 6) {
             throw new RuntimeException("Mật khẩu mới phải có ít nhất 6 ký tự!");
         }
@@ -119,7 +115,6 @@ public class AuthService {
             throw new RuntimeException("Mật khẩu mới và xác nhận mật khẩu không khớp!");
         }
 
-        // Cập nhật mật khẩu mới
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
