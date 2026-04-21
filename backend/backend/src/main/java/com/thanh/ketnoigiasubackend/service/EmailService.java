@@ -32,7 +32,6 @@ public class EmailService {
             System.err.println("Lỗi chi tiết: " + e.getMessage());
             e.printStackTrace();
 
-            // Throw exception rõ ràng để controller xử lý
             throw new RuntimeException("Không thể gửi OTP đến email \"" + toEmail
                     + "\". Email này có thể không tồn tại hoặc bị chặn. Vui lòng kiểm tra lại địa chỉ email!");
         }

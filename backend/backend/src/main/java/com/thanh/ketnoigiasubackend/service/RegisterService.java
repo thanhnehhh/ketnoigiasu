@@ -55,10 +55,9 @@ public class RegisterService {
 
     @Transactional
     public User registerTutor(RegisterTutorRequest request) {
-        // 1. Tạo User với mật khẩu rỗng và enabled = false
         User user = User.builder()
                 .email(request.getEmail())
-                .password("") // Để trống để nạp sau ở bước create-password
+                .password("")
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .role(Role.TUTOR)
@@ -67,11 +66,9 @@ public class RegisterService {
 
         User savedUser = userRepository.save(user);
 
-        // 2. Chuyển đổi List từ Request sang String để lưu vào DB (Khớp Entity của bạn)
         String subjectsStr = (request.getSubjects() != null) ? String.join(", ", request.getSubjects()) : "";
         String gradesStr = (request.getGrades() != null) ? String.join(", ", request.getGrades()) : "";
 
-        // 3. Tạo Profile
         TutorProfile profile = TutorProfile.builder()
                 .user(savedUser)
                 .gender(request.getGender())
@@ -97,7 +94,7 @@ public class RegisterService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-        // Validation mật khẩu (có thể thêm regex mạnh hơn sau)
+        // Validation mật khẩu
         if (password == null || password.length() < 6) {
             throw new RuntimeException("Mật khẩu phải có ít nhất 6 ký tự!");
         }

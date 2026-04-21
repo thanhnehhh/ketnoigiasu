@@ -39,16 +39,21 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/otp/**").permitAll()   // Quan trọng
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/api/otp/**"
+                        ).permitAll()
+                        .requestMatchers("/api/profile/**").authenticated()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/tutor/**").hasAnyRole("TUTOR", "ADMIN")
+                        .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN")
+
                         .anyRequest().authenticated()
-                );
+                )
 
-        // Tạm thời tắt Jwt Filter để test OTP
-        // .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
-
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
