@@ -4,6 +4,7 @@ import com.thanh.ketnoigiasubackend.security.JwtAuthenticationFilter;
 import com.thanh.ketnoigiasubackend.security.JwtAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,6 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.Arrays;
 
 @Configuration
@@ -39,21 +41,26 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/api/otp/**"
-                        ).permitAll()
+                        .requestMatchers("/api/auth/**", "/api/otp/**").permitAll()
                         .requestMatchers("/api/profile/**").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/tutor/**").hasAnyRole("TUTOR", "ADMIN")
                         .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN")
 
+                        // 1. Đưa cái cụ thể lên trước
+                        .requestMatchers("/api/courses/my-courses").hasAnyRole("TUTOR", "ADMIN")
+
+                        // 2. Sau đó mới đến cái bao quát có Method POST
+                        .requestMatchers(HttpMethod.POST, "/zapi/courses/**").hasRole("TUTOR")
+
+                        // 3. Cuối cùng mới là tất cả các request khác
                         .anyRequest().authenticated()
                 )
 
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
+
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();

@@ -40,7 +40,6 @@ public class ProfileService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Cập nhật thông tin User nếu có gửi lên
         if (request.getFullName() != null) user.setFullName(request.getFullName());
         if (request.getPhone() != null) user.setPhone(request.getPhone());
         userRepository.save(user);
@@ -48,7 +47,6 @@ public class ProfileService {
         StudentProfile profile = studentProfileRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
 
-        // Cập nhật Profile nếu có gửi lên
         if (request.getAddress() != null) profile.setAddress(request.getAddress());
         if (request.getGradeLevel() != null) profile.setGradeLevel(request.getGradeLevel());
         if (request.getLearningGoals() != null) profile.setLearningGoals(request.getLearningGoals());
@@ -68,7 +66,6 @@ public class ProfileService {
         TutorProfile profile = tutorProfileRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
 
-        // Cập nhật Profile gia sư nếu có gửi lên
         if (request.getGender() != null) profile.setGender(request.getGender());
         if (request.getDateOfBirth() != null) profile.setDateOfBirth(request.getDateOfBirth());
         if (request.getCccd() != null) profile.setCccd(request.getCccd());

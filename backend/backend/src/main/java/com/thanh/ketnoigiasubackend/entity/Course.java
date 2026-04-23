@@ -1,9 +1,12 @@
 package com.thanh.ketnoigiasubackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.thanh.ketnoigiasubackend.enums.CourseStatus;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "courses")
@@ -13,7 +16,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class Course {
-
+    @OneToMany(mappedBy = "course")
+    @JsonIgnore
+    private List<CourseRegistration> registrations;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -54,4 +59,7 @@ public class Course {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    private boolean isPromoted = false;
+    private LocalDateTime promotionExpiration;
 }

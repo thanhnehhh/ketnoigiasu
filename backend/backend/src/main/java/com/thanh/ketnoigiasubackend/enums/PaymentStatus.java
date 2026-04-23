@@ -2,6 +2,7 @@ package com.thanh.ketnoigiasubackend.enums;
 
 public enum PaymentStatus {
     PENDING_VERIFY,
-    VERIFIED,
-    REJECTED
+    SUCCESS,
+    REJECTED,
+    FAILED
 }

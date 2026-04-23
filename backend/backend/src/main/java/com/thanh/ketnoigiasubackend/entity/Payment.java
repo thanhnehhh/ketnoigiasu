@@ -23,6 +23,10 @@ public class Payment {
     private User user;
 
     @ManyToOne
+    @JoinColumn(name = "course_id")
+    private Course course;
+
+    @ManyToOne
     @JoinColumn(name = "enrollment_id")
     private Enrollment enrollment;
 
