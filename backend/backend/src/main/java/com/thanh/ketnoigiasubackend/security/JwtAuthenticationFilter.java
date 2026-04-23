@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -27,50 +28,58 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
             throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
+        System.out.println(">>> FILTER RUN");
 
-        // 1. Nếu có header Authorization
+        String header = request.getHeader("Authorization");
+        System.out.println("HEADER: " + header);
+
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
+            System.out.println("TOKEN: " + token);
+
             try {
                 String email = jwtUtil.extractEmail(token);
+                System.out.println("EMAIL: " + email);
 
-                if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                System.out.println("AUTHORITIES: " + userDetails.getAuthorities());
 
-                    // KIỂM TRA CHẶT: Phải khớp User và chưa hết hạn
-                    if (jwtUtil.isTokenValid(token, userDetails)) {
-                        UsernamePasswordAuthenticationToken authentication =
-                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                boolean isValid = jwtUtil.isTokenValid(token, userDetails);
+                System.out.println("VALID: " + isValid);
 
-                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                    } else {
-                        // Token sai hoặc hết hạn -> Trả về 401 luôn, dell cho đi tiếp
-                        sendErrorResponse(response, "Token dell hop le hoac da het han!");
-                        return;
-                    }
+                if (email != null && isValid) {
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    System.out.println(">>> AUTH SET SUCCESS");
                 }
+
             } catch (Exception e) {
-                // Token rác, bị sửa đổi, hoặc hết hạn ném ra Exception -> Chặn luôn
-                sendErrorResponse(response, "JWT Error: " + e.getMessage());
-                return;
+                System.out.println("JWT ERROR: " + e.getMessage());
             }
         }
 
-        // 2. Cho đi tiếp nếu mọi thứ ổn (hoặc không có token - lúc đó SecurityConfig sẽ check tiếp)
         filterChain.doFilter(request, response);
     }
-
-    // Hàm phụ để trả về lỗi 401 ngay tại Filter
-    private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
-        SecurityContextHolder.clearContext();
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"error\": \"" + message + "\"}");
+    private String getJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
     }
 }
