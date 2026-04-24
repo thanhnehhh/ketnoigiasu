@@ -41,22 +41,16 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/otp/**").permitAll()
-                        .requestMatchers("/api/profile/**").authenticated()
+                        .requestMatchers("/api/auth/**", "/api/otp/**", "/api/public/**").permitAll()
+
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/tutor/**").hasAnyRole("TUTOR", "ADMIN")
+                        .requestMatchers("/api/tutor/**", "/api/courses/my-courses").hasAnyRole("TUTOR", "ADMIN")
                         .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/tutor-profiles/**").hasAnyRole("STUDENT", "TUTOR", "ADMIN")
 
-                        // 1. Đưa cái cụ thể lên trước
-                        .requestMatchers("/api/courses/my-courses").hasAnyRole("TUTOR", "ADMIN")
-
-                        // 2. Sau đó mới đến cái bao quát có Method POST
-                        .requestMatchers(HttpMethod.POST, "/zapi/courses/**").hasRole("TUTOR")
-
-                        // 3. Cuối cùng mới là tất cả các request khác
+                        .requestMatchers("/api/profile/**").authenticated()
                         .anyRequest().authenticated()
                 )
-
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
