@@ -27,7 +27,6 @@ public class CourseController {
     }
     @GetMapping("/my-courses")
     public ResponseEntity<?> getMyCourses(Authentication auth) {
-        // auth.getName() chính là email của ông đã được Filter nạp vào
         return ResponseEntity.ok(courseService.getCoursesByTutorEmail(auth.getName()));
     }
 }

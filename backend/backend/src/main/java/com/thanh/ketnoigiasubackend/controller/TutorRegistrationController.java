@@ -1,5 +1,6 @@
 package com.thanh.ketnoigiasubackend.controller;
 
+import com.thanh.ketnoigiasubackend.dto.response.RegistrationResponse;
 import com.thanh.ketnoigiasubackend.entity.CourseRegistration;
 import com.thanh.ketnoigiasubackend.service.CourseRegistrationService;
 import com.thanh.ketnoigiasubackend.repository.UserRepository;
@@ -21,11 +22,11 @@ public class TutorRegistrationController {
 
     // 1. Tutor xem tất cả các đơn đăng ký vào các khóa học của mình
     @GetMapping
-    public ResponseEntity<List<CourseRegistration>> getMyApplications(Authentication auth) {
+    public ResponseEntity<List<RegistrationResponse>> getMyApplications(Authentication auth) {
         User user = userRepository.findByEmail(auth.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Gọi hàm tìm theo Tutor ID (User ID)
+        // Bây giờ Service trả về DTO nên Controller phải nhận DTO
         return ResponseEntity.ok(registrationService.getApplicationsForTutor(user.getId()));
     }
 
@@ -35,6 +36,7 @@ public class TutorRegistrationController {
             @PathVariable Long id,
             @RequestParam String status,
             Authentication auth) {
+        // Service.updateStatus giờ cũng trả về RegistrationResponse
         return ResponseEntity.ok(registrationService.updateStatus(id, status, auth.getName()));
     }
 }
