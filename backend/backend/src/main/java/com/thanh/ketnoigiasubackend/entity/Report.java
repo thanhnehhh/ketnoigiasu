@@ -5,14 +5,9 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reviews")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Review {
-
+@Table(name = "reports")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Report {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -25,25 +20,20 @@ public class Review {
     @JoinColumn(name = "student_id", nullable = false)
     private StudentProfile student;
 
-    @ManyToOne
-    @JoinColumn(name = "tutor_id", nullable = false)
-    private TutorProfile tutor;
+    @Column(nullable = false)
+    private String title; // Tiêu đề báo cáo
 
-    @Column(columnDefinition = "TEXT")
-    private String tutorReply;
-
-    private LocalDateTime repliedAt;
+    @Column(columnDefinition = "TEXT", nullable = false)
+    private String content; // Nội dung tố cáo
 
     @Column(nullable = false)
-    private Integer rating;
-
-    @Column(columnDefinition = "TEXT")
-    private String comment;
+    private String status; // PENDING, RESOLVED
 
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
+        this.status = "PENDING";
     }
 }

@@ -21,11 +21,10 @@ public class CourseRegistration {
     @JoinColumn(name = "student_id", nullable = false)
     private StudentProfile student;
 
-    // Trạng thái: PENDING (Chờ duyệt), ACCEPTED (Đã nhận), REJECTED (Từ chối)
     @Column(nullable = false)
     private String status;
 
-    private String notes; // Lời nhắn của học viên khi đăng ký
+    private String notes;
 
     private LocalDateTime appliedAt;
     private LocalDateTime updatedAt;
