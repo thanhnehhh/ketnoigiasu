@@ -5,5 +5,6 @@ public enum CourseStatus {
     APPROVED,
     REJECTED,
     ACTIVE,
-    CLOSED
+    CLOSED,
+    HIDDEN
 }

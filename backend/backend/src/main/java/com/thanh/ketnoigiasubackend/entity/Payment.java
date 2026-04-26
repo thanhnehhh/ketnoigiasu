@@ -27,8 +27,8 @@ public class Payment {
     private Course course;
 
     @ManyToOne
-    @JoinColumn(name = "enrollment_id")
-    private Enrollment enrollment;
+    @JoinColumn(name = "registration_id")
+    private CourseRegistration registration;
 
     @Column(nullable = false)
     private Double amount;

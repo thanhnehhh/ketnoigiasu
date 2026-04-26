@@ -16,7 +16,6 @@ public class StudentRegistrationController {
     private final CourseRegistrationService registrationService;
     private final UserRepository userRepository;
 
-    // Student xem danh sách đã đăng ký
     @GetMapping
     public ResponseEntity<?> getMyRegistrations(Authentication auth) {
         User user = userRepository.findByEmail(auth.getName())
@@ -24,8 +23,6 @@ public class StudentRegistrationController {
         return ResponseEntity.ok(registrationService.getRegistrationsForStudent(user.getId()));
     }
 
-    // Student thực hiện đăng ký (truyền courseId qua URL hoặc Body đều được)
-    // Ở đây tui dùng RequestParam cho lẹ: ?courseId=1&notes=Em muon hoc
     @PostMapping
     public ResponseEntity<?> register(
             @RequestParam Long courseId,
