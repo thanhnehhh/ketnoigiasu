@@ -50,6 +50,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/complaints/**").hasRole("TUTOR")
                         .requestMatchers("/api/profile/**").authenticated()
                         .requestMatchers("/api/reviews/**").hasRole("STUDENT")
+                        .requestMatchers(HttpMethod.POST, "/api/materials/tutor/upload").hasRole("TUTOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/materials/**").hasRole("TUTOR")
+                        .requestMatchers(HttpMethod.GET, "/api/materials/course/**").authenticated() // Học viên và gia sư đều xem được
+                        .requestMatchers(HttpMethod.GET, "/api/materials/download/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
