@@ -23,7 +23,7 @@ public class CourseService {
     private final UserRepository userRepository;
     private final TutorProfileRepository tutorProfileRepository;
     private final SubjectRepository subjectRepository;
-
+    private final SessionService sessionService;
     @Transactional
     public Course createCourse(String email, CourseRequest request) {
         User user = userRepository.findByEmail(email)
@@ -125,8 +125,14 @@ public class CourseService {
     public CourseResponse approveCourse(Long id) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khóa học"));
+
         course.setStatus(CourseStatus.APPROVED);
-        return mapToResponse(courseRepository.save(course));
+        Course savedCourse = courseRepository.save(course);
+
+        // TỰ ĐỘNG KHỞI TẠO CÁC BUỔI HỌC KHI DUYỆT (Ví dụ: 10 buổi)
+        sessionService.initializeSessions(savedCourse);
+
+        return mapToResponse(savedCourse);
     }
 
     // 4. Hàm từ chối khóa học
@@ -137,4 +143,5 @@ public class CourseService {
         course.setStatus(CourseStatus.REJECTED);
         return mapToResponse(courseRepository.save(course));
     }
+
 }
