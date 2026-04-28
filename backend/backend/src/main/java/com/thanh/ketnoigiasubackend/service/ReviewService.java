@@ -20,6 +20,7 @@ public class ReviewService {
     private final UserRepository userRepository;
     private final CourseRegistrationRepository registrationRepository;
     private final NotificationService notificationService;
+    private final CourseRepository courseRepository;
     @Transactional
     public ReviewResponse postReview(String email, ReviewRequest request) {
         User user = userRepository.findByEmail(email)
@@ -101,8 +102,12 @@ public class ReviewService {
         return mapToResponse(saved);
     }
     public List<ReviewResponse> getReviewsByCourse(Long courseId) {
-        return reviewRepository.findValidReviewsByCourseId(courseId).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        // 2. Tìm khóa học và check trạng thái
+        return courseRepository.findById(courseId)
+                .filter(course -> "ACTIVE".equals(course.getStatus())) // Chỉ cho đi tiếp nếu đang ACTIVE
+                .map(course -> reviewRepository.findValidReviewsByCourseId(courseId).stream()
+                        .map(this::mapToResponse)
+                        .collect(Collectors.toList()))
+                .orElse(List.of()); // Nếu bị HIDDEN hoặc không tìm thấy -> Trả về rỗng []
     }
 }

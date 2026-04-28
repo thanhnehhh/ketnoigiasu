@@ -2,6 +2,8 @@ package com.thanh.ketnoigiasubackend.service;
 
 import com.thanh.ketnoigiasubackend.dto.request.StudentProfileRequest;
 import com.thanh.ketnoigiasubackend.dto.request.TutorProfileRequest;
+import com.thanh.ketnoigiasubackend.dto.response.StudentProfileResponse;
+import com.thanh.ketnoigiasubackend.dto.response.TutorProfileResponse;
 import com.thanh.ketnoigiasubackend.entity.StudentProfile;
 import com.thanh.ketnoigiasubackend.entity.TutorProfile;
 import com.thanh.ketnoigiasubackend.entity.User;
@@ -26,17 +28,56 @@ public class ProfileService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (user.getRole() == Role.TUTOR) {
-            return tutorProfileRepository.findByUserId(user.getId())
+            TutorProfile tutor = tutorProfileRepository.findByUserId(user.getId())
                     .orElseThrow(() -> new RuntimeException("Tutor profile not found"));
+            return mapToTutorResponse(user, tutor); // Trả về DTO sạch cho Gia sư
         } else if (user.getRole() == Role.STUDENT) {
-            return studentProfileRepository.findByUserId(user.getId())
+            StudentProfile student = studentProfileRepository.findByUserId(user.getId())
                     .orElseThrow(() -> new RuntimeException("Student profile not found"));
+            return mapToStudentResponse(user, student); // Trả về DTO sạch cho Học viên
         }
-        return user;
+
+        return user; // Nếu là Admin thì hiện thông tin User cơ bản
+    }
+
+    private TutorProfileResponse mapToTutorResponse(User user, TutorProfile tutor) {
+        return TutorProfileResponse.builder()
+                .userId(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole().name())
+                .gender(tutor.getGender())
+                .address(tutor.getAddress())
+                .school(tutor.getSchool())
+                .major(tutor.getMajor())
+                .strengths(tutor.getStrengths())
+                // CHỖ NÀY CẦN FIX: Chuyển String thành List
+                .subjects(tutor.getSubjects() != null ?
+                        java.util.Arrays.asList(tutor.getSubjects().split("\\s*,\\s*")) : null)
+                .grades(tutor.getGrades() != null ?
+                        java.util.Arrays.asList(tutor.getGrades().split("\\s*,\\s*")) : null)
+                .avatar(user.getAvatar())
+                .build();
+    }
+
+    // Helper map sang StudentProfileResponse (Giấu password)
+    private StudentProfileResponse mapToStudentResponse(User user, StudentProfile student) {
+        return StudentProfileResponse.builder()
+                .userId(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole().name())
+                .address(student.getAddress())
+                .gradeLevel(student.getGradeLevel())
+                .learningGoals(student.getLearningGoals())
+                .avatar(user.getAvatar())
+                .build();
     }
 
     @Transactional
-    public StudentProfile updateStudentProfile(String email, StudentProfileRequest request) {
+    public StudentProfileResponse updateStudentProfile(String email, StudentProfileRequest request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -51,11 +92,13 @@ public class ProfileService {
         if (request.getGradeLevel() != null) profile.setGradeLevel(request.getGradeLevel());
         if (request.getLearningGoals() != null) profile.setLearningGoals(request.getLearningGoals());
 
-        return studentProfileRepository.save(profile);
+        studentProfileRepository.save(profile);
+
+        return mapToStudentResponse(user, profile);
     }
 
     @Transactional
-    public TutorProfile updateTutorProfile(String email, TutorProfileRequest request) {
+    public TutorProfileResponse updateTutorProfile(String email, TutorProfileRequest request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -79,6 +122,8 @@ public class ProfileService {
         if (request.getSubjects() != null) profile.setSubjects(request.getSubjects());
         if (request.getGrades() != null) profile.setGrades(request.getGrades());
 
-        return tutorProfileRepository.save(profile);
+        tutorProfileRepository.save(profile);
+
+        return mapToTutorResponse(user, profile);
     }
 }

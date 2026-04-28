@@ -91,10 +91,33 @@ public class PaymentService {
             courseRepository.save(course);
             notificationService.createNotification(payment.getUser(), "Khóa học '" + course.getTitle() + "' đã được đẩy tin!");
         }
-
+        else if ("TUITION_FEE".equals(payment.getPaymentType())) {
+            notificationService.createNotification(payment.getUser(), "Học phí của bạn đã được duyệt thành công! Chúc bạn học tốt.");
+        }
         return mapToResponse(paymentRepository.save(payment));
     }
 
+    // 5. Học viên nộp minh chứng chuyển khoản học phí
+    @Transactional
+    public PaymentResponse submitProof(Long paymentId, String proofImageUrl, String email) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy hóa đơn!"));
+
+        if (payment.getExpiresAt() != null && LocalDateTime.now().isAfter(payment.getExpiresAt())) {
+            payment.setStatus(PaymentStatus.FAILED);
+            paymentRepository.save(payment);
+            throw new RuntimeException("Hóa đơn này đã quá hạn 24 giờ. Vui lòng đăng ký lại khóa học!");
+        }
+
+        if (!payment.getUser().getEmail().equals(email)) {
+            throw new RuntimeException("Bạn không có quyền cập nhật hóa đơn này!");
+        }
+
+        payment.setProofImageUrl(proofImageUrl);
+        payment.setStatus(PaymentStatus.PENDING_VERIFY);
+
+        return mapToResponse(paymentRepository.save(payment));
+    }
     public boolean hasPaidPlatformFee(Long userId) {
         return paymentRepository.existsByUserIdAndPaymentTypeAndStatus(
                 userId, "PLATFORM_FEE", PaymentStatus.SUCCESS);

@@ -1,5 +1,6 @@
 package com.thanh.ketnoigiasubackend.controller;
 
+import com.thanh.ketnoigiasubackend.dto.response.ContractResponse;
 import com.thanh.ketnoigiasubackend.service.ContractService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +13,7 @@ public class AdminContractController {
     private final ContractService contractService;
 
     @PostMapping("/issue")
-    public ResponseEntity<?> issue(@RequestParam Long tutorId, @RequestBody String templateHtml) {
+    public ResponseEntity<ContractResponse> issue(@RequestParam Long tutorId, @RequestBody String templateHtml) {
         return ResponseEntity.ok(contractService.issueContract(tutorId, templateHtml));
     }
 

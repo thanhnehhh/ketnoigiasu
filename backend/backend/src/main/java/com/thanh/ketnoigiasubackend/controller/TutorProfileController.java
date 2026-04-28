@@ -13,7 +13,6 @@ public class TutorProfileController {
 
     private final TutorProfileService tutorProfileService;
 
-    // API để Student (hoặc khách) xem profile gia sư
     @GetMapping("/{id}")
     public ResponseEntity<TutorProfileResponse> getTutorProfile(@PathVariable Long id) {
         return ResponseEntity.ok(tutorProfileService.getPublicProfile(id));

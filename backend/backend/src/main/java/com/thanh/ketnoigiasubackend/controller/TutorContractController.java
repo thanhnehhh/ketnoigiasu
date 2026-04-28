@@ -1,9 +1,12 @@
 package com.thanh.ketnoigiasubackend.controller;
 
+import com.thanh.ketnoigiasubackend.dto.response.ContractResponse;
 import com.thanh.ketnoigiasubackend.service.ContractService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tutor/contracts")
@@ -17,9 +20,9 @@ public class TutorContractController {
     }
 
     @PostMapping("/{id}/sign")
-    public ResponseEntity<?> sign(@PathVariable Long id, @RequestBody String base64) {
-        contractService.signContract(id, base64);
-        return ResponseEntity.ok("Ký thành công!");
+    public ResponseEntity<ContractResponse> sign(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        String base64 = payload.get("signatureBase64");
+        return ResponseEntity.ok(contractService.signContract(id, base64));
     }
 
     @GetMapping("/{id}/download")
