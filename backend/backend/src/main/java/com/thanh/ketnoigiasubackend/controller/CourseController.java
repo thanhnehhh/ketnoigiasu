@@ -1,6 +1,7 @@
 package com.thanh.ketnoigiasubackend.controller;
 
 import com.thanh.ketnoigiasubackend.dto.request.CourseRequest;
+import com.thanh.ketnoigiasubackend.dto.response.CourseResponse;
 import com.thanh.ketnoigiasubackend.service.CourseService;
 import com.thanh.ketnoigiasubackend.service.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ public class CourseController {
     private final PaymentService paymentService;
 
     @PostMapping
-    public ResponseEntity<?> createCourse(@RequestBody CourseRequest request, Authentication auth) {
+    public ResponseEntity<CourseResponse> createCourse(@RequestBody CourseRequest request, Authentication auth) {
         return ResponseEntity.ok(courseService.createCourse(auth.getName(), request));
     }
 

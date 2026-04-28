@@ -10,15 +10,14 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CourseResponse {
+public class PaymentResponse {
     private Long id;
-    private String title;
-    private String description;
-    private String subjectName;
-    private String tutorName;
-    private Double pricePerSession;
-    private Integer totalSessions;
+    private String userFullName;
+    private String email;
+    private Double amount;
+    private String paymentType;
     private String status;
-    private boolean isPromoted;
+    private String proofImageUrl;
     private LocalDateTime createdAt;
+    private LocalDateTime verifiedAt;
 }

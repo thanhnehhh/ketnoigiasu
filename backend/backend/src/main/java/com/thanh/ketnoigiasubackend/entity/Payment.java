@@ -39,7 +39,7 @@ public class Payment {
     private String proofImageUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false, length = 50)
     private PaymentStatus status = PaymentStatus.PENDING_VERIFY;
 
     private String transactionCode;
