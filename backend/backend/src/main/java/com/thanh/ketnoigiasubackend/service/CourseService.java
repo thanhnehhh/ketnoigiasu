@@ -145,4 +145,36 @@ public class CourseService {
 
         return mapToResponse(savedCourse);
     }
+    @Transactional
+    public CourseResponse updateCourse(Long courseId, String email, CourseRequest request) {
+        // 1. Tìm user và course
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy khóa học"));
+
+        // 2. Kiểm tra quyền (Chỉ chủ khóa học mới được sửa)
+        if (!course.getTutor().getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Ông không có quyền sửa khóa học của người khác!");
+        }
+
+        // 3. Cập nhật thông tin mới
+        if (request.getTitle() != null) course.setTitle(request.getTitle());
+        if (request.getDescription() != null) course.setDescription(request.getDescription());
+        if (request.getPricePerSession() != null) course.setPricePerSession(request.getPricePerSession());
+        if (request.getTotalSessions() != null) course.setTotalSessions(request.getTotalSessions());
+
+        if (request.getSubjectId() != null) {
+            Subject subject = subjectRepository.findById(request.getSubjectId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy môn học"));
+            course.setSubject(subject);
+        }
+
+        // 4. QUAN TRỌNG NHẤT: Đổi trạng thái về PENDING_APPROVE để Admin duyệt lại
+        course.setStatus(CourseStatus.PENDING_APPROVE);
+
+        // 5. Lưu và trả về DTO
+        Course savedCourse = courseRepository.save(course);
+        return mapToResponse(savedCourse); // Giả sử ông đã có hàm mapToResponse giống ban nãy
+    }
 }

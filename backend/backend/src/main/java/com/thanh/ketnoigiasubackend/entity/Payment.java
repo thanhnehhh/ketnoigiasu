@@ -40,13 +40,14 @@ public class Payment {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
+    @Builder.Default
     private PaymentStatus status = PaymentStatus.PENDING_VERIFY;
 
     private String transactionCode;
 
     private LocalDateTime createdAt;
     private LocalDateTime verifiedAt;
-
+    private LocalDateTime expiresAt;
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

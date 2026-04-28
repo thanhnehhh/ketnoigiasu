@@ -17,10 +17,10 @@ public class TutorActivityController {
     private final NotificationService notificationService;
     private final CourseRepository courseRepository;
 
-    // 1. Tạo buổi học (Online/Offline) - Có bắn thông báo
-    @PostMapping("/session")
-    public ResponseEntity<?> createSession(@RequestParam Long courseId, @RequestBody SessionRequest request) {
-        return ResponseEntity.ok(sessionService.createSession(courseId, request));
+    // 1. Cập nhật lịch học (Online/Offline) vào buổi học có sẵn - Có bắn thông báo
+    @PutMapping("/session/{id}/schedule")
+    public ResponseEntity<?> updateSchedule(@PathVariable Long id, @RequestBody SessionRequest request) {
+        return ResponseEntity.ok(sessionService.updateSessionSchedule(id, request));
     }
 
     // 2. Ghi nhật ký dạy học sau khi kết thúc buổi

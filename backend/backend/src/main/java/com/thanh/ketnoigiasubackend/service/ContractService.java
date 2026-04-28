@@ -1,5 +1,6 @@
 package com.thanh.ketnoigiasubackend.service;
 
+import com.thanh.ketnoigiasubackend.dto.response.ContractResponse;
 import com.thanh.ketnoigiasubackend.entity.*;
 import com.thanh.ketnoigiasubackend.enums.ContractStatus;
 import com.thanh.ketnoigiasubackend.repository.*;
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +23,7 @@ public class ContractService {
 
     // 1. Khởi tạo hợp đồng (Issue)
     @Transactional
-    public Contract issueContract(Long tutorId, String rawTemplate) {
+    public ContractResponse issueContract(Long tutorId, String rawTemplate) {
         TutorProfile tutor = tutorProfileRepository.findById(tutorId)
                 .orElseThrow(() -> new RuntimeException("Gia sư không tồn tại"));
 
@@ -38,15 +40,22 @@ public class ContractService {
                 .build();
 
         notificationService.createNotification(tutor.getUser(), "Bạn có một yêu cầu ký kết hợp đồng mới trên hệ thống.");
-        return contractRepository.save(contract);
+
+        Contract savedContract = contractRepository.save(contract);
+        return mapToResponse(savedContract); // Trả về DTO
     }
 
     // 2. Theo dõi trạng thái ký kết
-    public List<Contract> getAllContracts() {
-        return contractRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<ContractResponse> getAllContracts() {
+        return contractRepository.findAll()
+                .stream()
+                .map(this::mapToResponse) // Dùng Stream map từng Entity sang DTO
+                .collect(Collectors.toList());
     }
 
     // 3. Xóa hợp đồng lỗi
+    @Transactional
     public void deleteContract(Long id) {
         contractRepository.deleteById(id);
     }
@@ -54,13 +63,17 @@ public class ContractService {
     // --- QUẢN LÝ CHO TUTOR ---
 
     // 4. Tra cứu lịch sử hợp đồng của tôi
-    public List<Contract> getMyContracts(Long tutorId) {
-        return contractRepository.findByTutorId(tutorId);
+    @Transactional(readOnly = true)
+    public List<ContractResponse> getMyContracts(Long tutorId) {
+        return contractRepository.findByTutorId(tutorId)
+                .stream()
+                .map(this::mapToResponse) // Dùng Stream map từng Entity sang DTO
+                .collect(Collectors.toList());
     }
 
     // 5. Thực hiện ký kết (Nhúng chữ ký Base64)
     @Transactional
-    public void signContract(Long contractId, String signatureBase64) {
+    public ContractResponse signContract(Long contractId, String signatureBase64) {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new RuntimeException("Không thấy hợp đồng"));
 
@@ -78,12 +91,30 @@ public class ContractService {
         contract.setStatus(ContractStatus.SIGNED);
         contract.setSignedAt(LocalDateTime.now());
 
-        contractRepository.save(contract);
+        Contract savedContract = contractRepository.save(contract);
+        return mapToResponse(savedContract); // Ký xong trả về hợp đồng mới nhất luôn
     }
 
-    public Contract getContractById(Long id) {
-        return contractRepository.findById(id)
+    // 6. Lấy chi tiết 1 hợp đồng
+    @Transactional(readOnly = true)
+    public ContractResponse getContractById(Long id) {
+        Contract contract = contractRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hợp đồng với ID này"));
+        return mapToResponse(contract);
     }
 
+    // --- HELPER METHOD ---
+    private ContractResponse mapToResponse(Contract contract) {
+        return ContractResponse.builder()
+                .id(contract.getId())
+                .tutorId(contract.getTutor().getId())
+                .tutorName(contract.getTutor().getUser().getFullName())
+                .tutorEmail(contract.getTutor().getUser().getEmail())
+                .contentSnapshot(contract.getContentSnapshot())
+                .signatureBase64(contract.getSignatureBase64())
+                .status(contract.getStatus().name())
+                .signedAt(contract.getSignedAt())
+                .createdAt(contract.getCreatedAt())
+                .build();
+    }
 }

@@ -18,30 +18,29 @@ public class SessionService {
     private final CourseRepository courseRepository;
     private final NotificationService notificationService;
 
+    // Thay thế cho hàm createSession cũ
     @Transactional
-    public SessionResponse createSession(Long courseId, SessionRequest request) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Khóa học không tồn tại"));
+    public SessionResponse updateSessionSchedule(Long sessionId, SessionRequest request) {
+        // Tìm cái "khung" buổi học đã được tạo sẵn
+        CourseSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy buổi học"));
 
-        // 1. Lưu buổi học vào DB
-        CourseSession session = CourseSession.builder()
-                .course(course)
-                .title(request.getTitle())
-                .notes(request.getNotes())
-                .onlineLink(request.getOnlineLink())
-                .startTime(request.getStartTime() != null ?
-                        LocalDateTime.parse(request.getStartTime()) : LocalDateTime.now())
-                .isCompleted(false)
-                .build();
+        Course course = session.getCourse();
+
+        // Cập nhật link Meet và giờ học vào khung đó
+        session.setOnlineLink(request.getOnlineLink());
+        if (request.getStartTime() != null) {
+            session.setStartTime(LocalDateTime.parse(request.getStartTime()));
+        }
 
         CourseSession saved = sessionRepository.save(session);
 
-        // 2. Gửi thông báo cho TẤT CẢ học viên trong lớp (Bỏ filter status để test cho dễ)
+        // Bắn thông báo cho học viên biết lịch học
         if (course.getRegistrations() != null && !course.getRegistrations().isEmpty()) {
             boolean isOnline = request.getOnlineLink() != null && !request.getOnlineLink().trim().isEmpty();
             String message = isOnline ?
-                    "Lớp học online đã mở! Click để vào học: " + request.getTitle() :
-                    "Gia sư vừa cập nhật lịch học mới cho lớp: " + course.getTitle();
+                    "Lớp học online đã mở! Click để vào học: " + session.getTitle() :
+                    "Gia sư vừa cập nhật lịch học mới cho " + session.getTitle();
 
             course.getRegistrations().forEach(reg -> {
                 if (reg.getStudent() != null && reg.getStudent().getUser() != null) {

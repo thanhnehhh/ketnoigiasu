@@ -30,4 +30,12 @@ public class CourseController {
     public ResponseEntity<?> getMyCourses(Authentication auth) {
         return ResponseEntity.ok(courseService.getCoursesByTutorEmail(auth.getName()));
     }
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateCourse(
+            @PathVariable Long id,
+            @RequestBody CourseRequest request,
+            Authentication auth) {
+
+        return ResponseEntity.ok(courseService.updateCourse(id, auth.getName(), request));
+    }
 }
