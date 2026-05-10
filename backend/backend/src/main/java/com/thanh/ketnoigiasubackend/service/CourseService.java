@@ -4,15 +4,16 @@ import com.thanh.ketnoigiasubackend.dto.request.CourseRequest;
 import com.thanh.ketnoigiasubackend.dto.response.CourseResponse;
 import com.thanh.ketnoigiasubackend.entity.*;
 import com.thanh.ketnoigiasubackend.enums.CourseStatus;
-import com.thanh.ketnoigiasubackend.repository.CourseRepository;
-import com.thanh.ketnoigiasubackend.repository.SubjectRepository;
-import com.thanh.ketnoigiasubackend.repository.TutorProfileRepository;
-import com.thanh.ketnoigiasubackend.repository.UserRepository;
+import com.thanh.ketnoigiasubackend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -25,16 +26,18 @@ public class CourseService {
     private final SessionService sessionService;
     private final PaymentService paymentService;
     private final NotificationService notificationService;
+    private final ReviewRepository reviewRepository;
+    private final CourseRegistrationRepository registrationRepository;
 
     @Transactional
-    public CourseResponse createCourse(String email, CourseRequest request) { // Đổi Course -> CourseResponse
+    public CourseResponse createCourse(String email, CourseRequest request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // KIỂM TRA PHÍ SÀN TRƯỚC KHI TẠO
         if (!paymentService.hasPaidPlatformFee(user.getId())) {
             notificationService.createNotification(user,
-                    "Bạn chưa thể tạo khóa học. Vui lòng hoàn tất thanh toán phí sàn theo hợp đồng và đợi Admin duyệt.");
+                    "Bạn chưa thể tạo khóa học. Vui lòng hoàn tất thanh toán phí sàn.",
+                    "/tutor/contracts");
             throw new RuntimeException("Yêu cầu thanh toán phí sàn chưa được duyệt hoặc chưa thanh toán.");
         }
 
@@ -56,48 +59,39 @@ public class CourseService {
                 .build();
 
         Course savedCourse = courseRepository.save(course);
-
-        // Thông báo cho gia sư
-        notificationService.createNotification(user, "Khóa học '" + savedCourse.getTitle() + "' đã được tạo thành công và đang chờ Admin duyệt nội dung.");
-
-        return mapToResponse(savedCourse); // Trả về DTO thay vì Entity
+        notificationService.createNotification(user,
+                "Khóa học '" + savedCourse.getTitle() + "' đã tạo, đang chờ Admin duyệt.",
+                "/tutor");
+        return mapToResponse(savedCourse);
     }
 
-    // Các hàm search, getCourses, approveCourse... giữ nguyên như cũ
     public List<CourseResponse> getCoursesByTutorEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return courseRepository.findByTutorUserId(user.getId()).stream().map(this::mapToResponse).toList();
+        return courseRepository.findByTutorUserId(user.getId())
+                .stream().map(this::mapToResponse).toList();
     }
 
     public List<CourseResponse> searchCourses(String keyword, String subject, Double minPrice, Double maxPrice) {
-        Specification<Course> spec = Specification.where((root, query, cb) -> cb.conjunction());
-        spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), CourseStatus.APPROVED));
-        if (keyword != null && !keyword.isEmpty()) {
+        // Bắt đầu với filter APPROVED — không dùng where(null) để tránh NPE
+        Specification<Course> spec = (root, query, cb) -> cb.equal(root.get("status"), CourseStatus.APPROVED);
+
+        if (keyword != null && !keyword.isEmpty())
             spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("title")), "%" + keyword.toLowerCase() + "%"));
-        }
-        if (subject != null && !subject.isEmpty()) {
+        if (subject != null && !subject.isEmpty())
             spec = spec.and((root, query, cb) -> cb.equal(root.get("subject").get("name"), subject));
-        }
-        if (minPrice != null) spec = spec.and((root, query, cb) -> cb.ge(root.get("pricePerSession"), minPrice));
-        if (maxPrice != null) spec = spec.and((root, query, cb) -> cb.le(root.get("pricePerSession"), maxPrice));
+        if (minPrice != null)
+            spec = spec.and((root, query, cb) -> cb.ge(root.get("pricePerSession"), minPrice));
+        if (maxPrice != null)
+            spec = spec.and((root, query, cb) -> cb.le(root.get("pricePerSession"), maxPrice));
 
-        return courseRepository.findAll(spec).stream().map(this::mapToResponse).toList();
-    }
+        List<CourseResponse> results = courseRepository.findAll(spec)
+                .stream().map(this::mapToResponse).toList();
 
-    private CourseResponse mapToResponse(Course course) {
-        return CourseResponse.builder()
-                .id(course.getId())
-                .title(course.getTitle())
-                .description(course.getDescription())
-                .subjectName(course.getSubject() != null ? course.getSubject().getName() : "N/A")
-                .tutorName(course.getTutor().getUser().getFullName())
-                .pricePerSession(course.getPricePerSession())
-                .totalSessions(course.getTotalSessions())
-                .status(course.getStatus().name())
-                .isPromoted(course.isPromoted())
-                .createdAt(course.getCreatedAt())
-                .build();
+        return results.stream()
+                .sorted(Comparator.comparing(CourseResponse::isPromoted).reversed()
+                        .thenComparing(Comparator.comparingDouble(CourseResponse::getScore).reversed()))
+                .toList();
     }
 
     @Transactional
@@ -107,74 +101,95 @@ public class CourseService {
         course.setStatus(CourseStatus.APPROVED);
         Course savedCourse = courseRepository.save(course);
         sessionService.initializeSessions(savedCourse);
-
-        // Thông báo cho gia sư khi khóa học được lên sàn
+        // Thông báo gia sư → link đến tab khóa học
         notificationService.createNotification(savedCourse.getTutor().getUser(),
-                "Khóa học '" + savedCourse.getTitle() + "' đã được Admin phê duyệt và hiển thị trên hệ thống!");
-
+                "✅ Khóa học '" + savedCourse.getTitle() + "' đã được duyệt và hiển thị trên hệ thống!",
+                "/tutor");
         return mapToResponse(savedCourse);
     }
 
-    // 1. Lấy khóa học theo trạng thái cho Admin
-    public List<CourseResponse> getCoursesByStatusForAdmin(CourseStatus status) {
-        return courseRepository.findAll().stream()
-                .filter(c -> c.getStatus() == status)
-                .map(this::mapToResponse)
-                .toList();
-    }
-
-    // 2. Lấy tất cả khóa học để Admin thống kê
-    public List<CourseResponse> getAllCoursesForAdmin() {
-        return courseRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
-
-    // 3. Hàm từ chối khóa học
     @Transactional
     public CourseResponse rejectCourse(Long id) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khóa học"));
-
         course.setStatus(CourseStatus.REJECTED);
         Course savedCourse = courseRepository.save(course);
-
-        // Thông báo cho gia sư biết khóa học bị từ chối
         notificationService.createNotification(savedCourse.getTutor().getUser(),
-                "Rất tiếc, khóa học '" + savedCourse.getTitle() + "' đã bị từ chối nội dung. Vui lòng kiểm tra lại.");
-
+                "❌ Khóa học '" + savedCourse.getTitle() + "' bị từ chối. Vui lòng kiểm tra lại nội dung.",
+                "/tutor");
         return mapToResponse(savedCourse);
     }
+
     @Transactional
     public CourseResponse updateCourse(Long courseId, String email, CourseRequest request) {
-        // 1. Tìm user và course
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khóa học"));
-
-        // 2. Kiểm tra quyền (Chỉ chủ khóa học mới được sửa)
-        if (!course.getTutor().getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Ông không có quyền sửa khóa học của người khác!");
-        }
-
-        // 3. Cập nhật thông tin mới
+        if (!course.getTutor().getUser().getId().equals(user.getId()))
+            throw new RuntimeException("Bạn không có quyền sửa khóa học của người khác!");
         if (request.getTitle() != null) course.setTitle(request.getTitle());
         if (request.getDescription() != null) course.setDescription(request.getDescription());
         if (request.getPricePerSession() != null) course.setPricePerSession(request.getPricePerSession());
         if (request.getTotalSessions() != null) course.setTotalSessions(request.getTotalSessions());
-
         if (request.getSubjectId() != null) {
             Subject subject = subjectRepository.findById(request.getSubjectId())
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy môn học"));
             course.setSubject(subject);
         }
-
-        // 4. QUAN TRỌNG NHẤT: Đổi trạng thái về PENDING_APPROVE để Admin duyệt lại
         course.setStatus(CourseStatus.PENDING_APPROVE);
+        return mapToResponse(courseRepository.save(course));
+    }
 
-        // 5. Lưu và trả về DTO
-        Course savedCourse = courseRepository.save(course);
-        return mapToResponse(savedCourse); // Giả sử ông đã có hàm mapToResponse giống ban nãy
+    public List<CourseResponse> getCoursesByStatusForAdmin(CourseStatus status) {
+        return courseRepository.findAll().stream().filter(c -> c.getStatus() == status).map(this::mapToResponse).toList();
+    }
+
+    public List<CourseResponse> getAllCoursesForAdmin() {
+        return courseRepository.findAll().stream().map(this::mapToResponse).toList();
+    }
+
+    @Scheduled(fixedRate = 3600000)
+    @Transactional
+    public void expirePromotions() {
+        List<Course> expiredCourses = courseRepository.findAll().stream()
+                .filter(c -> c.isPromoted() && c.getPromotionExpiration() != null
+                        && LocalDateTime.now().isAfter(c.getPromotionExpiration()))
+                .toList();
+        for (Course course : expiredCourses) {
+            course.setPromoted(false);
+            course.setPromotionExpiration(null);
+            notificationService.createNotification(course.getTutor().getUser(),
+                    "Gói đẩy tin cho khóa học '" + course.getTitle() + "' đã hết hạn.",
+                    "/tutor");
+        }
+        if (!expiredCourses.isEmpty()) courseRepository.saveAll(expiredCourses);
+    }
+
+    private double calculateScore(Course course, Double avgRating, long totalRegistrations) {
+        double promotedBonus = course.isPromoted() ? 1000.0 : 0.0;
+        double ratingScore = (avgRating != null ? avgRating : 0.0) * 150.0;
+        double popularityScore = totalRegistrations * 8.0;
+        long daysSinceCreated = course.getCreatedAt() != null
+                ? ChronoUnit.DAYS.between(course.getCreatedAt(), LocalDateTime.now()) : 0;
+        return promotedBonus + ratingScore + popularityScore - daysSinceCreated * 0.3;
+    }
+
+    private CourseResponse mapToResponse(Course course) {
+        Double avgRating = reviewRepository.getAvgRatingByCourseId(course.getId());
+        long totalRegistrations = registrationRepository.countByCourseId(course.getId());
+        double score = calculateScore(course, avgRating, totalRegistrations);
+        return CourseResponse.builder()
+                .id(course.getId()).title(course.getTitle()).description(course.getDescription())
+                .subjectName(course.getSubject() != null ? course.getSubject().getName() : "N/A")
+                .tutorName(course.getTutor().getUser().getFullName())
+                .tutorProfileId(course.getTutor().getId())
+                .pricePerSession(course.getPricePerSession()).totalSessions(course.getTotalSessions())
+                .status(course.getStatus().name()).isPromoted(course.isPromoted())
+                .promotionExpiration(course.getPromotionExpiration()).createdAt(course.getCreatedAt())
+                .avgRating(avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0)
+                .registrationCount((int) totalRegistrations)
+                .score(Math.round(score * 10.0) / 10.0)
+                .build();
     }
 }

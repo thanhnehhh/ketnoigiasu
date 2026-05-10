@@ -30,4 +30,10 @@ public class StudentRegistrationController {
             Authentication auth) {
         return ResponseEntity.ok(registrationService.registerCourse(courseId, auth.getName(), notes));
     }
+
+    // Học viên xác nhận hoàn thành khóa học (để mở khóa tính năng đánh giá)
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<?> complete(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(registrationService.completeCourse(id, auth.getName()));
+    }
 }

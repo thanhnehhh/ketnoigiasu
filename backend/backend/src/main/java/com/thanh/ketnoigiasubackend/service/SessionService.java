@@ -54,7 +54,7 @@ public class SessionService {
 
     @Transactional(readOnly = true)
     public List<SessionResponse> getSessionsByCourse(Long courseId) {
-        return sessionRepository.findByCourseIdOrderByStartTimeDesc(courseId).stream()
+        return sessionRepository.findByCourseIdOrderBySessionOrderAsc(courseId).stream()
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -64,23 +64,49 @@ public class SessionService {
         CourseSession currentSession = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy buổi học"));
 
-        // 1. Logic chặn dạy nhảy buổi
+        // 1. Kiểm tra thời gian: chỉ cho ghi nhật ký sau khi buổi học đã diễn ra
+        if (currentSession.getStartTime() == null) {
+            throw new RuntimeException("Buổi học này chưa được lên lịch. Vui lòng cập nhật thời gian trước.");
+        }
+        if (LocalDateTime.now().isBefore(currentSession.getStartTime())) {
+            throw new RuntimeException("Buổi học chưa diễn ra. Chỉ có thể xác nhận sau " +
+                    currentSession.getStartTime().toLocalDate() + " lúc " +
+                    currentSession.getStartTime().toLocalTime().withSecond(0).withNano(0) + ".");
+        }
+
+        // 2. Chặn dạy nhảy buổi — phải hoàn thành buổi trước
         if (currentSession.getSessionOrder() > 1) {
             CourseSession previousSession = sessionRepository
                     .findByCourseIdAndSessionOrder(currentSession.getCourse().getId(), currentSession.getSessionOrder() - 1)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy buổi học trước đó"));
 
             if (!previousSession.isCompleted()) {
-                throw new RuntimeException("Bạn chưa hoàn thành nhật ký buổi " + (currentSession.getSessionOrder() - 1));
+                throw new RuntimeException("Bạn chưa hoàn thành nhật ký buổi " + (currentSession.getSessionOrder() - 1) +
+                        ". Vui lòng hoàn thành theo thứ tự.");
             }
         }
 
-        // 2. Cập nhật
+        // 3. Cập nhật nhật ký và đánh dấu hoàn thành
         currentSession.setNotes(notes);
         currentSession.setCompleted(true);
-        currentSession.setUpdatedAt(LocalDateTime.now()); // Hết lỗi setUpdatedAt ở đây
+        currentSession.setUpdatedAt(LocalDateTime.now());
 
-        return mapToResponse(sessionRepository.save(currentSession));
+        CourseSession saved = sessionRepository.save(currentSession);
+
+        // 4. Thông báo cho học viên biết buổi học đã được xác nhận
+        Course course = currentSession.getCourse();
+        if (course.getRegistrations() != null) {
+            course.getRegistrations().stream()
+                    .filter(reg -> "ACTIVE".equals(reg.getStatus()))
+                    .forEach(reg -> notificationService.createNotification(
+                            reg.getStudent().getUser(),
+                            "✅ Gia sư đã xác nhận hoàn thành " + currentSession.getTitle() +
+                            " của lớp '" + course.getTitle() + "'.",
+                            "/student/course/" + course.getId()
+                    ));
+        }
+
+        return mapToResponse(saved);
     }
 
     @Transactional
@@ -102,13 +128,20 @@ public class SessionService {
     }
 
     private SessionResponse mapToResponse(CourseSession s) {
+        // canConfirm = true khi: có startTime VÀ startTime đã qua VÀ chưa hoàn thành
+        boolean canConfirm = !s.isCompleted()
+                && s.getStartTime() != null
+                && LocalDateTime.now().isAfter(s.getStartTime());
+
         return SessionResponse.builder()
                 .id(s.getId())
+                .sessionOrder(s.getSessionOrder())
                 .title(s.getTitle())
                 .notes(s.getNotes())
                 .onlineLink(s.getOnlineLink())
                 .isCompleted(s.isCompleted())
                 .startTime(s.getStartTime() != null ? s.getStartTime().toString() : "")
+                .canConfirm(canConfirm)
                 .build();
     }
 

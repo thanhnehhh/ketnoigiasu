@@ -13,4 +13,10 @@ public interface CourseRegistrationRepository extends JpaRepository<CourseRegist
     List<CourseRegistration> findByCourseInAndStatusIn(List<Course> courses, List<String> statuses);
 
     List<CourseRegistration> findByCourseAndStatusIn(Course course, List<String> statuses);
+
+    // Đếm số học viên đang học (ACTIVE) của một khóa học — dùng cho ranking
+    long countByCourseIdAndStatus(Long courseId, String status);
+
+    // Đếm tổng số đăng ký (kể cả COMPLETED) — thể hiện độ phổ biến
+    long countByCourseId(Long courseId);
 }

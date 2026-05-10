@@ -1,0 +1,263 @@
+/* ===== COURSE DETAIL PAGE ===== */
+.course-detail-page {
+    min-height: 100vh;
+    background: #f8fafc;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.cd-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+/* Breadcrumb */
+.cd-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 1.5rem;
+}
+.cd-breadcrumb a { color: #4f46e5; text-decoration: none; }
+.cd-breadcrumb a:hover { text-decoration: underline; }
+
+/* Layout */
+.cd-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+/* Header card */
+.cd-header-card {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    margin-bottom: 1.5rem;
+}
+
+.cd-promoted-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+}
+
+.cd-subject-tag {
+    display: inline-block;
+    background: #ede9fe;
+    color: #6d28d9;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 12px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+}
+
+.cd-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #1f2937;
+    line-height: 1.3;
+    margin-bottom: 1rem;
+}
+
+.cd-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.cd-tutor-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+.cd-tutor-link:hover { text-decoration: underline; }
+
+.cd-rating, .cd-students {
+    font-size: 0.88rem;
+    color: #374151;
+}
+
+/* Sections */
+.cd-section {
+    background: white;
+    border-radius: 20px;
+    padding: 1.75rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    margin-bottom: 1.5rem;
+}
+.cd-section h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 1.25rem;
+}
+
+.cd-description {
+    color: #374151;
+    line-height: 1.8;
+    font-size: 0.95rem;
+    white-space: pre-line;
+}
+
+/* Info grid */
+.cd-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+.cd-info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #f1f5f9;
+}
+.cd-info-icon { font-size: 1.4rem; }
+.cd-info-label { font-size: 0.78rem; color: #64748b; margin-bottom: 2px; }
+.cd-info-value { font-size: 0.95rem; font-weight: 700; color: #1f2937; }
+
+/* Reviews */
+.cd-reviews { display: flex; flex-direction: column; gap: 1rem; }
+.cd-review-item {
+    padding: 1.25rem;
+    background: #f8fafc;
+    border-radius: 14px;
+    border: 1px solid #f1f5f9;
+}
+.cd-review-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.cd-review-name { font-weight: 600; color: #1f2937; font-size: 0.9rem; }
+.cd-review-comment {
+    color: #374151;
+    font-style: italic;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    margin: 0 0 8px;
+}
+.cd-tutor-reply {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+    color: #374151;
+}
+.cd-tutor-reply p { margin: 4px 0 0; }
+
+/* ===== SIDEBAR ===== */
+.cd-sidebar { position: sticky; top: 90px; }
+
+.cd-register-card {
+    background: white;
+    border-radius: 20px;
+    padding: 1.75rem;
+    box-shadow: 0 8px 30px rgba(79,70,229,0.12);
+    border: 1.5px solid #c7d2fe;
+    margin-bottom: 1rem;
+}
+
+.cd-price {
+    margin-bottom: 4px;
+}
+.cd-price-amount {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #4f46e5;
+}
+.cd-price-unit {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    margin-left: 4px;
+}
+.cd-total-price {
+    font-size: 0.88rem;
+    color: #64748b;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.cd-register-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    margin-bottom: 1rem;
+}
+.cd-register-btn:hover { opacity: 0.9; }
+.cd-register-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.cd-register-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #374151;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.cd-tutor-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+}
+.cd-tutor-card h3 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 0.75rem;
+}
+.cd-tutor-link-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    padding: 8px;
+    border-radius: 10px;
+    transition: background 0.2s;
+}
+.cd-tutor-link-card:hover { background: #f8fafc; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+    .cd-layout { grid-template-columns: 1fr; }
+    .cd-sidebar { position: static; }
+    .cd-title { font-size: 1.4rem; }
+}
+@media (max-width: 600px) {
+    .cd-info-grid { grid-template-columns: 1fr; }
+}

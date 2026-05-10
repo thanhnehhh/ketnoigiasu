@@ -25,9 +25,15 @@ public class AuthService {
     private final OtpService otpService;
 
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (org.springframework.security.authentication.DisabledException e) {
+            throw new RuntimeException("Tài khoản chưa được kích hoạt. Vui lòng hoàn tất đăng ký qua OTP.");
+        } catch (org.springframework.security.authentication.BadCredentialsException e) {
+            throw new RuntimeException("Email hoặc mật khẩu không đúng!");
+        }
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại!"));

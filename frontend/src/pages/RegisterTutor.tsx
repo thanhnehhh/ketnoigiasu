@@ -1,181 +1,297 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../services/api';
+import PasswordInput from '../components/PasswordInput';
 import '../css/RegisterTutor.css';
 
-const RegisterTutor = () => {
-    const [formData, setFormData] = useState({
-        fullName: '',
-        gender: '',
-        dateOfBirth: '',
-        cccd: '',
-        cccdIssuedPlace: '',
-        address: '',
-        email: '',
-        phone: '',
-        school: '',
-        major: '',
-        graduationYear: '',
-        currentOccupation: '',
-        strengths: '',
-        teachingAreas: [] as string[],
-        subjects: [] as string[],
-        grades: [] as string[],
-    });
+/**
+ * Flow đúng theo BE:
+ * Bước 1 — Nhập email → POST /api/otp/send { email, role: "TUTOR" }
+ * Bước 2 — Nhập OTP + thông tin + mật khẩu → POST /api/otp/verify/tutor
+ *   body: { email, otp, password, confirmPassword,
+ *           registerData: { fullName, gender, dateOfBirth, cccd, cccdIssuedPlace,
+ *                           address, phone, school, major, graduationYear,
+ *                           currentOccupation, strengths, subjects[], grades[] } }
+ */
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
+type Step = 'email' | 'info';
+
+const SUBJECTS = ['Toán', 'Lý', 'Hóa', 'Văn', 'Tiếng Anh', 'Tiếng Trung', 'Tiếng Nhật', 'IELTS', 'TOEIC', 'Lịch sử', 'Địa lý', 'Sinh học', 'Tin học'];
+const GRADES   = [...Array.from({ length: 12 }, (_, i) => `Lớp ${i + 1}`), 'Đại học', 'Ngoại ngữ'];
+
+export default function RegisterTutor() {
+    const navigate = useNavigate();
+    const [step, setStep]       = useState<Step>('email');
+    const [loading, setLoading] = useState(false);
+    const [error, setError]     = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
+
+    // Bước 1
+    const [email, setEmail] = useState('');
+
+    // Bước 2 — credentials
+    const [otp, setOtp]                       = useState('');
+    const [password, setPassword]             = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    // Bước 2 — registerData (khớp RegisterTutorRequest)
+    const [fullName, setFullName]               = useState('');
+    const [gender, setGender]                   = useState('');
+    const [dateOfBirth, setDateOfBirth]         = useState('');
+    const [cccd, setCccd]                       = useState('');
+    const [cccdIssuedPlace, setCccdIssuedPlace] = useState('');
+    const [address, setAddress]                 = useState('');
+    const [phone, setPhone]                     = useState('');
+    const [school, setSchool]                   = useState('');
+    const [major, setMajor]                     = useState('');
+    const [graduationYear, setGraduationYear]   = useState('');
+    const [currentOccupation, setCurrentOccupation] = useState('');
+    const [strengths, setStrengths]             = useState('');
+    const [subjects, setSubjects]               = useState<string[]>([]);
+    const [grades, setGrades]                   = useState<string[]>([]);
+
+    const toggle = (list: string[], setList: (v: string[]) => void, val: string) => {
+        setList(list.includes(val) ? list.filter(v => v !== val) : [...list, val]);
     };
 
-    const handleMultiSelect = (field: 'subjects' | 'grades' | 'teachingAreas', value: string) => {
-        setFormData(prev => ({
-            ...prev,
-            [field]: prev[field].includes(value)
-                ? prev[field].filter(item => item !== value)
-                : [...prev[field], value]
-        }));
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
+    /* ---- BƯỚC 1 ---- */
+    const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Đăng ký Gia sư:", formData);
-        alert("Đăng ký tài khoản Gia sư thành công! (Chưa kết nối backend)");
+        setError('');
+        setLoading(true);
+        try {
+            const res = await api.post('/otp/send', { email, role: 'TUTOR' });
+            setSuccessMsg(res.data.message || 'OTP đã gửi! Kiểm tra hộp thư.');
+            setStep('info');
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Không gửi được OTP.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /* ---- BƯỚC 2 ---- */
+    const handleRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        if (password !== confirmPassword) { setError('Mật khẩu xác nhận không khớp!'); return; }
+        if (subjects.length === 0) { setError('Chọn ít nhất 1 môn dạy'); return; }
+        if (grades.length === 0)   { setError('Chọn ít nhất 1 lớp dạy'); return; }
+        setLoading(true);
+        try {
+            const res = await api.post('/otp/verify/tutor', {
+                email,
+                otp,
+                password,
+                confirmPassword,
+                registerData: {
+                    fullName,
+                    gender,
+                    dateOfBirth: dateOfBirth || null,
+                    cccd,
+                    cccdIssuedPlace,
+                    address,
+                    email,
+                    phone,
+                    school,
+                    major,
+                    graduationYear: graduationYear ? parseInt(graduationYear) : null,
+                    currentOccupation,
+                    strengths,
+                    subjects,
+                    grades,
+                },
+            });
+
+            const token: string = res.data.token;
+            localStorage.setItem('token', token);
+            const meRes = await api.get('/auth/me', {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            localStorage.setItem('user', JSON.stringify(meRes.data));
+
+            setSuccessMsg('Đăng ký thành công! Đang chuyển hướng...');
+            setTimeout(() => navigate('/tutor'), 1000);
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Đăng ký thất bại.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <div className="register-tutor-page">
             <div className="register-container">
-                <h1 className="register-title">ĐĂNG KÝ LÀM GIA SƯ</h1>
-                <p className="register-subtitle">* Vui lòng cung cấp đầy đủ thông tin bên dưới để chúng tôi tiện liên lạc.</p>
+                <Link to="/" className="back-to-home">← Trang chủ</Link>
+                <h1 className="register-title">Đăng ký làm Gia sư</h1>
+                <p className="register-subtitle">Điền đầy đủ thông tin để bắt đầu dạy học</p>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="form-grid">
-                        <div className="form-group full-width">
-                            <label>Tỉnh/Thành dạy *</label>
-                            <select name="province" required>
-                                <option value="">Chọn Tỉnh/Thành</option>
-                                <option value="TP.HCM">TP. Hồ Chí Minh</option>
-                                <option value="Hà Nội">Hà Nội</option>
-                                <option value="Đà Nẵng">Đà Nẵng</option>
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Họ và tên *</label>
-                            <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} required />
-                        </div>
-
-                        <div className="form-group">
-                            <label>Giới tính *</label>
-                            <select name="gender" value={formData.gender} onChange={handleChange} required>
-                                <option value="">Chọn giới tính</option>
-                                <option value="Nam">Nam</option>
-                                <option value="Nữ">Nữ</option>
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Ngày sinh *</label>
-                            <input type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} required />
-                        </div>
-
-                        <div className="form-group">
-                            <label>Số CCCD *</label>
-                            <input type="text" name="cccd" value={formData.cccd} onChange={handleChange} required />
-                        </div>
-
-                        <div className="form-group full-width">
-                            <label>Nơi cấp CCCD *</label>
-                            <select name="cccdIssuedPlace" value={formData.cccdIssuedPlace} onChange={handleChange} required>
-                                <option value="">Tỉnh/Thành trên CCCD</option>
-                                <option value="TP.HCM">TP. Hồ Chí Minh</option>
-                                <option value="Hà Nội">Hà Nội</option>
-                            </select>
-                        </div>
-
-                        <div className="form-group full-width">
-                            <label>Địa chỉ hiện tại *</label>
-                            <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Số nhà, đường, phường/xã, quận/huyện" />
-                        </div>
-
-                        <div className="form-group">
-                            <label>Email *</label>
-                            <input type="email" name="email" value={formData.email} onChange={handleChange} required />
-                        </div>
-
-                        <div className="form-group">
-                            <label>Điện thoại *</label>
-                            <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required />
-                        </div>
-
-                        <div className="form-group full-width">
-                            <label>Trường học / Nơi công tác hiện tại</label>
-                            <input type="text" name="school" value={formData.school} onChange={handleChange} placeholder="Ví dụ: Đại học Sư Phạm" />
-                        </div>
-
-                        <div className="form-group">
-                            <label>Năm tốt nghiệp</label>
-                            <input type="text" name="graduationYear" value={formData.graduationYear} onChange={handleChange} placeholder="Ví dụ: 2018" />
-                        </div>
-
-                        <div className="form-group full-width">
-                            <label>Ưu điểm / Kinh nghiệm nổi bật *</label>
-                            <textarea
-                                name="strengths"
-                                value={formData.strengths}
-                                onChange={handleChange}
-                                placeholder="Ví dụ: 4 năm kinh nghiệm dạy kèm Toán lớp 10-12, nhiệt tình, có phương pháp dạy dễ hiểu..."
-                                required
-                            />
-                        </div>
-
-                        {/* Môn dạy */}
-                        <div className="form-group full-width">
-                            <label>Môn dạy *</label>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-                                {['Toán', 'Lý', 'Hóa', 'Văn', 'Tiếng Anh', 'Tiếng Trung', 'Tiếng Nhật', 'IELTS', 'TOEIC', 'Lịch sử', 'Địa lý'].map(subject => (
-                                    <label key={subject} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.subjects.includes(subject)}
-                                            onChange={() => handleMultiSelect('subjects', subject)}
-                                        />
-                                        {subject}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Lớp dạy */}
-                        <div className="form-group full-width">
-                            <label>Lớp dạy *</label>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
-                                {Array.from({ length: 12 }, (_, i) => `Lớp ${i+1}`).map(grade => (
-                                    <label key={grade} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.grades.includes(grade)}
-                                            onChange={() => handleMultiSelect('grades', grade)}
-                                        />
-                                        {grade}
-                                    </label>
-                                ))}
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <input type="checkbox" onChange={() => handleMultiSelect('grades', 'Ngoại ngữ')} />
-                                    Ngoại ngữ
-                                </label>
-                            </div>
-                        </div>
+                <div className="step-indicator">
+                    <div className={`step ${step === 'email' ? 'active' : 'done'}`}>
+                        <span>{step === 'email' ? '1' : '✓'}</span> Xác thực email
                     </div>
+                    <div className="step-line" />
+                    <div className={`step ${step === 'info' ? 'active' : ''}`}>
+                        <span>2</span> Thông tin & OTP
+                    </div>
+                </div>
 
-                    <button type="submit" className="register-button">
-                        Đăng ký làm Gia sư
-                    </button>
-                </form>
+                {error      && <div className="alert alert-error">{error}</div>}
+                {successMsg && step === 'email' && <div className="alert alert-success">{successMsg}</div>}
+
+                {/* ===== BƯỚC 1 ===== */}
+                {step === 'email' && (
+                    <form onSubmit={handleSendOtp}>
+                        <div className="form-group full-width" style={{ marginBottom: '1.5rem' }}>
+                            <label>Email *</label>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                required
+                                placeholder="example@gmail.com"
+                                autoFocus
+                            />
+                            <p className="field-hint">Mã OTP sẽ được gửi đến email này</p>
+                        </div>
+                        <button type="submit" className="register-button" disabled={loading}>
+                            {loading ? 'Đang gửi OTP...' : '📧 Gửi mã OTP'}
+                        </button>
+                        <div className="back-link">
+                            Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+                            {' · '}
+                            <Link to="/register/student">Đăng ký học viên</Link>
+                        </div>
+                    </form>
+                )}
+
+                {/* ===== BƯỚC 2 ===== */}
+                {step === 'info' && (
+                    <form onSubmit={handleRegister}>
+                        <div className="otp-sent-notice">
+                            📧 OTP đã gửi đến <strong>{email}</strong> — kiểm tra hộp thư (kể cả Spam)
+                        </div>
+
+                        {/* OTP + MẬT KHẨU */}
+                        <div className="form-section-title">Mã xác thực & Mật khẩu</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label>Mã OTP *</label>
+                                <input className="otp-field" value={otp} onChange={e => setOtp(e.target.value)}
+                                    required maxLength={6} placeholder="_ _ _ _ _ _" autoFocus />
+                            </div>
+                            <div className="form-group">
+                                <label>Mật khẩu *</label>
+                                <PasswordInput value={password} onChange={e => setPassword(e.target.value)}
+                                    required minLength={6} placeholder="Tối thiểu 6 ký tự" autoComplete="new-password" />
+                            </div>
+                            <div className="form-group">
+                                <label>Xác nhận mật khẩu *</label>
+                                <PasswordInput value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                                    required placeholder="Nhập lại mật khẩu" autoComplete="new-password" />
+                            </div>
+                        </div>
+
+                        {/* THÔNG TIN CÁ NHÂN */}
+                        <div className="form-section-title">Thông tin cá nhân</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label>Họ và tên *</label>
+                                <input value={fullName} onChange={e => setFullName(e.target.value)} required placeholder="Nguyễn Văn A" />
+                            </div>
+                            <div className="form-group">
+                                <label>Giới tính *</label>
+                                <select value={gender} onChange={e => setGender(e.target.value)} required>
+                                    <option value="">-- Chọn --</option>
+                                    <option value="Nam">Nam</option>
+                                    <option value="Nữ">Nữ</option>
+                                    <option value="Khác">Khác</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Số điện thoại *</label>
+                                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} required placeholder="0912345678" />
+                            </div>
+                            <div className="form-group">
+                                <label>Ngày sinh</label>
+                                <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                                <label>Số CCCD *</label>
+                                <input value={cccd} onChange={e => setCccd(e.target.value)} required placeholder="012345678901" />
+                            </div>
+                            <div className="form-group">
+                                <label>Nơi cấp CCCD *</label>
+                                <input value={cccdIssuedPlace} onChange={e => setCccdIssuedPlace(e.target.value)} required placeholder="Cục CS QLHC về TTXH" />
+                            </div>
+                            <div className="form-group full-width">
+                                <label>Địa chỉ *</label>
+                                <input value={address} onChange={e => setAddress(e.target.value)} required placeholder="Số nhà, đường, phường, quận, tỉnh/thành" />
+                            </div>
+                        </div>
+
+                        {/* HỌC VẤN & KINH NGHIỆM */}
+                        <div className="form-section-title">Học vấn & Kinh nghiệm</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label>Trường học / Nơi công tác</label>
+                                <input value={school} onChange={e => setSchool(e.target.value)} placeholder="Đại học Sư Phạm TP.HCM" />
+                            </div>
+                            <div className="form-group">
+                                <label>Chuyên ngành</label>
+                                <input value={major} onChange={e => setMajor(e.target.value)} placeholder="Sư phạm Toán" />
+                            </div>
+                            <div className="form-group">
+                                <label>Năm tốt nghiệp</label>
+                                <input type="number" value={graduationYear} onChange={e => setGraduationYear(e.target.value)} placeholder="2020" min="1990" max="2030" />
+                            </div>
+                            <div className="form-group">
+                                <label>Nghề nghiệp hiện tại</label>
+                                <input value={currentOccupation} onChange={e => setCurrentOccupation(e.target.value)} placeholder="Giáo viên / Sinh viên..." />
+                            </div>
+                            <div className="form-group full-width">
+                                <label>Kinh nghiệm & Ưu điểm *</label>
+                                <textarea value={strengths} onChange={e => setStrengths(e.target.value)} required rows={3}
+                                    placeholder="Ví dụ: 3 năm kinh nghiệm dạy Toán lớp 10-12, phương pháp dễ hiểu..." />
+                            </div>
+                        </div>
+
+                        {/* MÔN DẠY */}
+                        <div className="form-section-title">
+                            Môn dạy * <span className="hint">(chọn ít nhất 1)</span>
+                        </div>
+                        <div className="checkbox-grid" style={{ marginBottom: '1.5rem' }}>
+                            {SUBJECTS.map(s => (
+                                <label key={s} className={`checkbox-item ${subjects.includes(s) ? 'checked' : ''}`}>
+                                    <input type="checkbox" checked={subjects.includes(s)} onChange={() => toggle(subjects, setSubjects, s)} />
+                                    {s}
+                                </label>
+                            ))}
+                        </div>
+
+                        {/* LỚP DẠY */}
+                        <div className="form-section-title">
+                            Lớp dạy * <span className="hint">(chọn ít nhất 1)</span>
+                        </div>
+                        <div className="checkbox-grid" style={{ marginBottom: '1.5rem' }}>
+                            {GRADES.map(g => (
+                                <label key={g} className={`checkbox-item ${grades.includes(g) ? 'checked' : ''}`}>
+                                    <input type="checkbox" checked={grades.includes(g)} onChange={() => toggle(grades, setGrades, g)} />
+                                    {g}
+                                </label>
+                            ))}
+                        </div>
+
+                        <button type="submit" className="register-button" disabled={loading}>
+                            {loading ? 'Đang đăng ký...' : '✅ Hoàn tất đăng ký'}
+                        </button>
+                        <button type="button" className="btn-back"
+                            onClick={() => { setStep('email'); setError(''); setSuccessMsg(''); setOtp(''); }}>
+                            ← Đổi email
+                        </button>
+                    </form>
+                )}
             </div>
         </div>
     );
-};
-
-export default RegisterTutor;
+}

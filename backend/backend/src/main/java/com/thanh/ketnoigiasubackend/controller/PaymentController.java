@@ -24,10 +24,15 @@ public class PaymentController {
     public ResponseEntity<?> submitPaymentProof(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         String proofImageUrl = body.get("proofImageUrl");
-
         return ResponseEntity.ok(paymentService.submitProof(id, proofImageUrl, email));
+    }
+
+    // Xem tất cả hóa đơn của mình (học viên xem TUITION_FEE, gia sư xem PLATFORM_FEE + PROMOTE)
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyPayments() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return ResponseEntity.ok(paymentService.getMyPayments(email));
     }
 }

@@ -22,7 +22,13 @@ public class Notification {
     private User user;
 
     private String message;
+
+    @Column(name = "action_url")
+    private String actionUrl;  // URL để FE navigate khi click thông báo
+
+    @Column(name = "is_read", nullable = false)
     private boolean isRead;
+
     private LocalDateTime createdAt;
 
     @PrePersist

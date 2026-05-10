@@ -1,7 +1,6 @@
 package com.thanh.ketnoigiasubackend.controller;
 
 import com.thanh.ketnoigiasubackend.dto.response.NotificationResponse;
-import com.thanh.ketnoigiasubackend.entity.Notification;
 import com.thanh.ketnoigiasubackend.entity.User;
 import com.thanh.ketnoigiasubackend.repository.UserRepository;
 import com.thanh.ketnoigiasubackend.service.NotificationService;
@@ -14,18 +13,36 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/notifications")
-@RequiredArgsConstructor // Cái này tự động tạo Constructor để inject các field 'final' bên dưới
+@RequiredArgsConstructor
 public class NotificationController {
 
-    // Khai báo các service cần thiết là 'final' để @RequiredArgsConstructor nó inject vào
     private final NotificationService notificationService;
     private final UserRepository userRepository;
 
     @GetMapping("/my")
     public ResponseEntity<List<NotificationResponse>> getMyNotifications() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
-
+        User user = getCurrentUser();
         return ResponseEntity.ok(notificationService.getMyNotifications(user.getId()));
+    }
+
+    // Đánh dấu 1 thông báo đã đọc
+    @PutMapping("/{id}/read")
+    public ResponseEntity<?> markAsRead(@PathVariable Long id) {
+        User user = getCurrentUser();
+        notificationService.markAsRead(id, user.getId());
+        return ResponseEntity.ok("Đã đánh dấu đã đọc.");
+    }
+
+    // Đánh dấu tất cả đã đọc
+    @PutMapping("/read-all")
+    public ResponseEntity<?> markAllAsRead() {
+        User user = getCurrentUser();
+        notificationService.markAllAsRead(user.getId());
+        return ResponseEntity.ok("Đã đánh dấu tất cả là đã đọc.");
+    }
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
     }
 }
