@@ -39,7 +39,9 @@ public class ContractService {
                 .status(ContractStatus.PENDING)
                 .build();
 
-        notificationService.createNotification(tutor.getUser(), "Bạn có một yêu cầu ký kết hợp đồng mới trên hệ thống.");
+        notificationService.createNotification(tutor.getUser(),
+                "📄 Bạn có hợp đồng mới cần ký. Vui lòng xem và ký kết.",
+                "/tutor/contracts");
 
         Contract savedContract = contractRepository.save(contract);
         return mapToResponse(savedContract); // Trả về DTO

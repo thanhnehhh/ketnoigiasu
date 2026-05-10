@@ -4,6 +4,7 @@ import com.thanh.ketnoigiasubackend.dto.request.ReplyRequest;
 import com.thanh.ketnoigiasubackend.dto.request.ReviewRequest;
 import com.thanh.ketnoigiasubackend.dto.response.ReviewResponse;
 import com.thanh.ketnoigiasubackend.entity.*;
+import com.thanh.ketnoigiasubackend.enums.CourseStatus;
 import com.thanh.ketnoigiasubackend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -49,7 +50,8 @@ public class ReviewService {
 
         notificationService.createNotification(
                 saved.getTutor().getUser(),
-                "Học viên " + user.getFullName() + " đã đánh giá " + saved.getRating() + " sao cho lớp " + saved.getRegistration().getCourse().getTitle()
+                "⭐ Học viên " + user.getFullName() + " đánh giá " + saved.getRating() + " sao cho lớp '" + saved.getRegistration().getCourse().getTitle() + "'.",
+                "/tutor"
         );
 
         return mapToResponse(saved);
@@ -97,17 +99,19 @@ public class ReviewService {
 
         notificationService.createNotification(
                 saved.getStudent().getUser(),
-                "Gia sư " + saved.getTutor().getUser().getFullName() + " đã phản hồi đánh giá của bạn."
+                "💬 Gia sư " + saved.getTutor().getUser().getFullName() + " đã phản hồi đánh giá của bạn.",
+                "/student"
         );
         return mapToResponse(saved);
     }
     public List<ReviewResponse> getReviewsByCourse(Long courseId) {
-        // 2. Tìm khóa học và check trạng thái
-        return courseRepository.findById(courseId)
-                .filter(course -> "ACTIVE".equals(course.getStatus())) // Chỉ cho đi tiếp nếu đang ACTIVE
-                .map(course -> reviewRepository.findValidReviewsByCourseId(courseId).stream()
-                        .map(this::mapToResponse)
-                        .collect(Collectors.toList()))
-                .orElse(List.of()); // Nếu bị HIDDEN hoặc không tìm thấy -> Trả về rỗng []
+        // Chỉ cần khóa học tồn tại và không bị HIDDEN là cho xem review
+        Course course = courseRepository.findById(courseId).orElse(null);
+        if (course == null || course.getStatus() == CourseStatus.HIDDEN) {
+            return List.of();
+        }
+        return reviewRepository.findValidReviewsByCourseId(courseId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 }

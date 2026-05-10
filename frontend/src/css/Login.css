@@ -20,14 +20,7 @@
     text-align: center;
 }
 
-.login-logo {
-    font-size: 2rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 0.5rem;
-}
+/* logo style moved to bottom of file */
 
 .login-subtitle {
     color: #6b7280;
@@ -95,17 +88,39 @@
     cursor: not-allowed;
 }
 
+.forgot-link {
+    text-align: right;
+    margin-bottom: 0.5rem;
+    margin-top: -0.5rem;
+}
+.forgot-link a {
+    font-size: 0.88rem;
+    color: #4f46e5;
+    text-decoration: none;
+}
+.forgot-link a:hover { text-decoration: underline; }
+
 .register-link {
     margin-top: 2rem;
     color: #6b7280;
+    font-size: 0.9rem;
+    text-align: center;
 }
-
 .register-link a {
     color: #4f46e5;
     font-weight: 600;
     text-decoration: none;
 }
+.register-link a:hover { text-decoration: underline; }
 
-.register-link a:hover {
-    text-decoration: underline;
+/* logo as link */
+.login-logo {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+    text-decoration: none;
 }

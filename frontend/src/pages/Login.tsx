@@ -1,25 +1,32 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import PasswordInput from '../components/PasswordInput';
 import '../css/Login.css';
 
-const Login = () => {
+export default function Login() {
+    const { login } = useAuth();
+    const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const { login } = useAuth();
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
-
         try {
-            await login(email, password);
+            const userData = await login(email, password);
+            if (userData.role === 'ADMIN')      navigate('/admin',   { replace: true });
+            else if (userData.role === 'TUTOR') navigate('/tutor',   { replace: true });
+            else                                navigate('/student', { replace: true });
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.');
+            const data = err.response?.data;
+            const msg = (typeof data === 'string' ? data : data?.message || data?.error)
+                || err.message
+                || 'Đăng nhập thất bại. Kiểm tra lại email và mật khẩu.';
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -28,14 +35,10 @@ const Login = () => {
     return (
         <div className="login-page">
             <div className="login-container">
-                <div className="login-logo">Kết Nối Gia Sư</div>
+                <Link to="/" className="login-logo">Kết Nối Gia Sư</Link>
                 <p className="login-subtitle">Đăng nhập để tiếp tục</p>
 
-                {error && (
-                    <div className="error-message">
-                        {error}
-                    </div>
-                )}
+                {error && <div className="error-message">{error}</div>}
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
@@ -43,39 +46,39 @@ const Login = () => {
                         <input
                             type="email"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            onChange={e => setEmail(e.target.value)}
                             required
-                            placeholder="example@email.com"
+                            placeholder="example@gmail.com"
+                            autoComplete="email"
+                            autoFocus
                         />
                     </div>
-
                     <div className="form-group">
                         <label>Mật khẩu</label>
-                        <input
-                            type="password"
+                        <PasswordInput
                             value={password}
-                            onChange={(e) => setPassword(e.target.value)}
+                            onChange={e => setPassword(e.target.value)}
                             required
-                            placeholder="••••••••"
+                            autoComplete="current-password"
                         />
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="login-button"
-                    >
+                    <div className="forgot-link">
+                        <Link to="/forgot-password">Quên mật khẩu?</Link>
+                    </div>
+
+                    <button type="submit" disabled={loading} className="login-button">
                         {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                     </button>
                 </form>
 
                 <div className="register-link">
                     Chưa có tài khoản?{' '}
-                    <Link to="/register">Đăng ký ngay</Link>
+                    <Link to="/register/student">Đăng ký học viên</Link>
+                    {' · '}
+                    <Link to="/register/tutor">Đăng ký gia sư</Link>
                 </div>
             </div>
         </div>
     );
-};
-
-export default Login;
+}

@@ -30,25 +30,47 @@
 .main-nav a { color: #4b5563; font-weight: 500; text-decoration: none; transition: 0.2s; }
 .main-nav a:hover { color: #4f46e5; }
 
-/* ===== NÚT BẤM BẰNG NHAU ===== */
+/* ===== AUTH BUTTONS ===== */
 .auth-buttons {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
 }
 
+.user-logged-in {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-dashboard {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: #ede9fe;
+    color: #4f46e5;
+    border-radius: 9999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+.btn-dashboard:hover { background: #ddd6fe; }
+
 .btn-login, .btn-register, .btn-logout {
-    width: 120px;            /* Chiều rộng bằng nhau */
-    height: 42px;           /* Chiều cao bằng nhau */
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 0 20px;
     border-radius: 9999px;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     transition: 0.25s;
     cursor: pointer;
     text-decoration: none;
     box-sizing: border-box;
+    white-space: nowrap;
 }
 
 .btn-login {
@@ -69,37 +91,34 @@
 .btn-logout {
     color: #ef4444;
     border: 1.5px solid #ef4444;
+    background: transparent;
     font-weight: 500;
+    padding: 0 16px;
 }
+.btn-logout:hover { background: #fee2e2; }
 
-/* ===== FIX DROPDOWN HOVER ===== */
+/* ===== DROPDOWN ===== */
 .register-dropdown {
     position: relative;
-    display: inline-block; /* Quan trọng: Giữ khung bọc sát nút */
+    display: inline-block;
 }
 
-/* Tạo lớp phủ vô hình để chuột rê từ nút xuống menu không bị mất hover */
 .register-dropdown::before {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: -20px; /* Kéo dài vùng hover xuống dưới nút */
+    top: 0; left: 0; right: 0;
+    bottom: -20px;
     z-index: 1;
 }
 
-.btn-register {
-    position: relative;
-    z-index: 2; /* Nổi lên trên lớp đệm */
-}
+.btn-register { position: relative; z-index: 2; }
 
 .dropdown-menu {
     position: absolute;
-    top: calc(100% + 10px); /* Cách nút một khoảng nhỏ cho đẹp */
+    top: calc(100% + 10px);
     right: 0;
     background: white;
-    border-radius: 12px;
+    border-radius: 14px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
     min-width: 220px;
     padding: 8px 0;
@@ -108,8 +127,8 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .dropdown-item {
@@ -118,14 +137,9 @@
     color: #374151;
     text-decoration: none;
     font-weight: 500;
+    font-size: 0.92rem;
     transition: 0.2s;
     position: relative;
     z-index: 1101;
 }
-
-.dropdown-item:hover {
-    background: #f3f4f6;
-    color: #4f46e5;
-}
-
-.welcome-msg { margin-right: 15px; color: #374151; }
+.dropdown-item:hover { background: #f3f4f6; color: #4f46e5; }

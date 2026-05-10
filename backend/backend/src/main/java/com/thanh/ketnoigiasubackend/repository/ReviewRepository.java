@@ -11,8 +11,16 @@ import java.util.List;
 public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findByTutorUserId(Long tutorUserId);
     List<Review> findByRegistrationCourseId(Long courseId);
+
     @Query("SELECT r FROM Review r WHERE r.registration.course.id = :courseId")
     List<Review> findByCourseId(@Param("courseId") Long courseId);
+
     @Query("SELECT r FROM Review r WHERE r.registration.course.id = :courseId AND r.rating > 0")
     List<Review> findValidReviewsByCourseId(@Param("courseId") Long courseId);
+
+    @Query("SELECT COALESCE(AVG(r.rating), 0.0) FROM Review r WHERE r.registration.course.id = :courseId AND r.rating > 0")
+    Double getAvgRatingByCourseId(@Param("courseId") Long courseId);
+
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.registration.course.id = :courseId AND r.rating > 0")
+    Long countValidReviewsByCourseId(@Param("courseId") Long courseId);
 }

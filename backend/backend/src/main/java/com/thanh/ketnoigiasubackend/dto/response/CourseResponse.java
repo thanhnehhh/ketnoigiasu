@@ -16,9 +16,15 @@ public class CourseResponse {
     private String description;
     private String subjectName;
     private String tutorName;
+    private Long tutorProfileId;   // để frontend link sang trang profile gia sư
     private Double pricePerSession;
     private Integer totalSessions;
     private String status;
     private boolean isPromoted;
+    private LocalDateTime promotionExpiration;
     private LocalDateTime createdAt;
+    // Ranking fields
+    private Double avgRating;
+    private Integer registrationCount;
+    private Double score;          // điểm tổng hợp để sort
 }

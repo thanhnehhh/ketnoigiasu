@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface SessionRepository extends JpaRepository<CourseSession, Long> {
     List<CourseSession> findByCourseIdOrderByStartTimeDesc(Long courseId);
+    List<CourseSession> findByCourseIdOrderBySessionOrderAsc(Long courseId);
     Optional<CourseSession> findByCourseIdAndSessionOrder(Long courseId, Integer sessionOrder);
 }
