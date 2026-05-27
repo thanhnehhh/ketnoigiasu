@@ -45,6 +45,12 @@ public class Payment {
 
     private String transactionCode;
 
+    // Admin đánh dấu đã chuyển tiền cho gia sư (sau khi khấu trừ phí sàn)
+    @Builder.Default
+    private boolean transferredToTutor = false;
+    private LocalDateTime transferredAt;
+    private String transferProofUrl;  // Minh chứng chuyển khoản của Admin
+
     private LocalDateTime createdAt;
     private LocalDateTime verifiedAt;
     private LocalDateTime expiresAt;

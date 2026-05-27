@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import Header from '../components/Header';
@@ -63,7 +63,9 @@ const COURSE_STATUS: Record<string, { label: string; color: string }> = {
 
 export default function TutorDashboard() {
     const { user, logout } = useAuth();
-    const [tab, setTab] = useState<'courses' | 'applications' | 'payments' | 'notifications' | 'reviews'>('courses');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tab = (searchParams.get('tab') as 'courses' | 'applications' | 'payments' | 'notifications' | 'reviews') || 'courses';
+    const setTab = (t: 'courses' | 'applications' | 'payments' | 'notifications' | 'reviews') => setSearchParams({ tab: t });
     const [courses, setCourses] = useState<Course[]>([]);
     const [applications, setApplications] = useState<Registration[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -242,6 +244,7 @@ export default function TutorDashboard() {
                             ⭐ Đánh giá {reviews.length > 0 && <span className="badge" style={{ background: '#f59e0b' }}>{reviews.length}</span>}
                         </button>
                         <Link to="/tutor/contracts" className="dash-nav-link">📄 Hợp đồng</Link>
+                        <Link to="/tutor/payments" className="dash-nav-link">💰 Quản lý thanh toán</Link>
                         <Link to="/profile" className="dash-nav-link">👤 Hồ sơ của tôi</Link>
                         <button className="btn-fee" onClick={() => { setFeeModal(true); setFeeMsg(''); }}>
                             💵 Nộp phí sàn

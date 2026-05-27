@@ -18,6 +18,7 @@ import ReviewPage       from './pages/ReviewPage';
 import TutorContractPage  from './pages/TutorContractPage';
 import TutorProfileDetail from './pages/TutorProfileDetail';
 import CourseDetail       from './pages/CourseDetail';
+import TutorPaymentPage   from './pages/TutorPaymentPage';
 
 // Guard: chỉ cho vào nếu đã đăng nhập đúng role
 function RoleGuard({ role, children }: { role: string | string[]; children: ReactNode }) {
@@ -74,6 +75,9 @@ function AppRoutes() {
             } />
             <Route path="/tutor/contracts" element={
                 <RoleGuard role="TUTOR"><TutorContractPage /></RoleGuard>
+            } />
+            <Route path="/tutor/payments" element={
+                <RoleGuard role="TUTOR"><TutorPaymentPage /></RoleGuard>
             } />
 
             {/* ===== PUBLIC — TUTOR PROFILE ===== */}

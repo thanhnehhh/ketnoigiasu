@@ -42,6 +42,11 @@ public class TutorProfile {
     @Column(columnDefinition = "TEXT")
     private String grades;
 
+    // Thông tin tài khoản thụ hưởng
+    private String bankName;      // Tên ngân hàng
+    private String bankAccount;   // Số tài khoản
+    private String bankOwner;     // Tên chủ tài khoản
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

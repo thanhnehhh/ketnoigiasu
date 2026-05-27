@@ -111,16 +111,16 @@ export default function RegisterStudent() {
                 {step === 'email' && (
                     <form onSubmit={handleSendOtp}>
                         <div className="form-group full-width" style={{ marginBottom: '1.5rem' }}>
-                            <label>Email *</label>
+                            <label>Email phụ huynh *</label>
                             <input
                                 type="email"
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
                                 required
-                                placeholder="example@gmail.com"
+                                placeholder="email.phuhuynh@gmail.com"
                                 autoFocus
                             />
-                            <p className="field-hint">Mã OTP sẽ được gửi đến email này</p>
+                            <p className="field-hint">Mã OTP sẽ được gửi đến email phụ huynh này</p>
                         </div>
                         <button type="submit" className="register-button" disabled={loading}>
                             {loading ? 'Đang gửi OTP...' : '📧 Gửi mã OTP'}
@@ -137,7 +137,7 @@ export default function RegisterStudent() {
                 {step === 'info' && (
                     <form onSubmit={handleRegister}>
                         <div className="otp-sent-notice">
-                            📧 OTP đã gửi đến <strong>{email}</strong> — kiểm tra hộp thư (kể cả Spam)
+                            📧 OTP đã gửi đến email phụ huynh <strong>{email}</strong> — kiểm tra hộp thư (kể cả Spam)
                         </div>
 
                         <div className="form-section-title">Mã xác thực & Mật khẩu</div>
@@ -192,7 +192,7 @@ export default function RegisterStudent() {
                                 />
                             </div>
                             <div className="form-group">
-                                <label>Số điện thoại *</label>
+                                <label>Số điện thoại phụ huynh *</label>
                                 <input
                                     type="tel"
                                     value={phone}
