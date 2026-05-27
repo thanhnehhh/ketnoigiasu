@@ -21,8 +21,14 @@ public class PaymentResponse {
     private LocalDateTime createdAt;
     private LocalDateTime verifiedAt;
     private LocalDateTime expiresAt;
-    // Thông tin liên kết để Admin/User biết payment này thuộc về đâu
     private Long courseId;
     private String courseTitle;
     private Long registrationId;
+    // Thông tin ngân hàng gia sư — hiển thị cho học viên khi cần nộp học phí
+    private String tutorBankName;
+    private String tutorBankAccount;
+    private String tutorBankOwner;
+    private boolean transferredToTutor;
+    private LocalDateTime transferredAt;
+    private String transferProofUrl;
 }

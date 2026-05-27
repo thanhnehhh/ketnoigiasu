@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import ChatBox from '../components/ChatBox';
 import '../css/CourseRoom.css';
 
 interface Session {
@@ -37,10 +38,18 @@ interface Registration {
     pricePerSession: number;
 }
 
+interface ActiveStudent {
+    registrationId: number;
+    studentName: string;
+    studentEmail: string;
+}
+
 export default function CourseRoom() {
     const { courseId } = useParams<{ courseId: string }>();
-    const { user } = useAuth();
-    const [tab, setTab] = useState<'sessions' | 'materials' | 'report'>('sessions');
+    const { user, loading: authLoading } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tab = (searchParams.get('tab') as 'sessions' | 'chat' | 'report' | 'parent-report') || 'sessions';
+    const setTab = (t: 'sessions' | 'chat' | 'report' | 'parent-report') => setSearchParams({ tab: t });
     const [sessions, setSessions] = useState<Session[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
     const [registration, setRegistration] = useState<Registration | null>(null);
@@ -53,7 +62,7 @@ export default function CourseRoom() {
     const [scheduleForm, setScheduleForm] = useState({ onlineLink: '', startTime: '' });
 
     // Log modal (tutor)
-    const [logModal, setLogModal] = useState<{ open: boolean; session: Session | null }>({ open: false, session: null });
+    const [logModal, setLogModal] = useState<{ open: boolean; session: Session | null; isEdit: boolean }>({ open: false, session: null, isEdit: false });
     const [logNotes, setLogNotes] = useState('');
 
     // Announcement (tutor)
@@ -67,29 +76,54 @@ export default function CourseRoom() {
     const [reportTitle, setReportTitle] = useState('');
     const [reportContent, setReportContent] = useState('');
 
+    // Báo cáo phụ huynh (tutor)
+    const [activeStudents, setActiveStudents] = useState<ActiveStudent[]>([]);
+    const [selectedRegId, setSelectedRegId] = useState<number | null>(null);
+    const [parentReportNote, setParentReportNote] = useState('');
+    const [parentReportMsg, setParentReportMsg] = useState('');
+    const [parentReportErr, setParentReportErr] = useState(false);
+    const [sendingReport, setSendingReport] = useState(false);
+
     const isStudent = user?.role === 'STUDENT';
     const isTutor   = user?.role === 'TUTOR';
 
-    useEffect(() => { fetchAll(); }, [courseId]);
+    // Chờ auth load xong mới fetch — tránh gọi API với role sai → 401
+    useEffect(() => {
+        if (!authLoading && user && courseId) {
+            fetchAll();
+        }
+    }, [authLoading, user, courseId]);
+
+    // Fetch danh sách học viên ACTIVE khi tutor mở tab báo cáo phụ huynh
+    useEffect(() => {
+        if (!authLoading && isTutor && tab === 'parent-report' && courseId) {
+            api.get(`/tutor/activities/course/${courseId}/students`)
+                .then(res => {
+                    setActiveStudents(res.data);
+                    if (res.data.length > 0) setSelectedRegId(res.data[0].registrationId);
+                })
+                .catch(console.error);
+        }
+    }, [tab, isTutor, courseId, authLoading]);
 
     const fetchAll = async () => {
+        if (!user || !courseId) return;
+        const isStudentRole = user.role === 'STUDENT';
         setLoading(true);
         try {
             const [sessRes, matRes] = await Promise.all([
-                isStudent
+                isStudentRole
                     ? api.get(`/student/activities/course/${courseId}/sessions`)
                     : api.get(`/tutor/activities/course/${courseId}`),
-                isStudent
+                isStudentRole
                     ? api.get(`/student/activities/course/${courseId}/materials`)
                     : api.get(`/materials/course/${courseId}`),
             ]);
-            // Sort theo sessionOrder
             const sorted = [...sessRes.data].sort((a: Session, b: Session) => a.sessionOrder - b.sessionOrder);
             setSessions(sorted);
             setMaterials(matRes.data);
 
-            // Lấy thông tin registration của student
-            if (isStudent) {
+            if (isStudentRole) {
                 const regRes = await api.get('/student/registrations');
                 const found = regRes.data.find((r: Registration) => r.courseId === parseInt(courseId!));
                 setRegistration(found || null);
@@ -125,11 +159,18 @@ export default function CourseRoom() {
         if (!logModal.session) return;
         if (!logNotes.trim()) { flash('❌ Vui lòng nhập nội dung nhật ký', true); return; }
         try {
-            await api.put(`/tutor/activities/session/${logModal.session.id}/log`, logNotes, {
-                headers: { 'Content-Type': 'text/plain' }
-            });
-            flash('✅ Đã ghi nhật ký buổi ' + logModal.session.sessionOrder + '!');
-            setLogModal({ open: false, session: null });
+            if (logModal.isEdit) {
+                await api.put(`/tutor/activities/session/${logModal.session.id}/edit-log`, logNotes, {
+                    headers: { 'Content-Type': 'text/plain' }
+                });
+                flash('✅ Đã cập nhật nhật ký!');
+            } else {
+                await api.put(`/tutor/activities/session/${logModal.session.id}/log`, logNotes, {
+                    headers: { 'Content-Type': 'text/plain' }
+                });
+                flash('✅ Đã ghi nhật ký buổi ' + logModal.session.sessionOrder + '!');
+            }
+            setLogModal({ open: false, session: null, isEdit: false });
             setLogNotes('');
             fetchAll();
         } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
@@ -192,6 +233,26 @@ export default function CourseRoom() {
         } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
     };
 
+    const sendParentReport = async () => {
+        if (!selectedRegId) { setParentReportMsg('❌ Vui lòng chọn học viên'); setParentReportErr(true); return; }
+        setSendingReport(true);
+        setParentReportMsg('');
+        try {
+            await api.post('/tutor/activities/report-to-parent', {
+                registrationId: selectedRegId,
+                extraNote: parentReportNote,
+            });
+            setParentReportMsg('✅ Đã gửi báo cáo học tập đến email phụ huynh thành công!');
+            setParentReportErr(false);
+            setParentReportNote('');
+        } catch (e: any) {
+            setParentReportMsg('❌ ' + (e.response?.data?.message || 'Lỗi gửi báo cáo'));
+            setParentReportErr(true);
+        } finally {
+            setSendingReport(false);
+        }
+    };
+
     // Tính tiến độ
     const completedCount = sessions.filter(s => s.isCompleted).length;
     const totalCount = sessions.length;
@@ -207,6 +268,17 @@ export default function CourseRoom() {
         if (fileType.includes('zip') || fileType.includes('rar')) return '📦';
         return '📄';
     };
+
+    // Chờ auth load xong — tránh render với user=null rồi gọi API sai
+    if (authLoading) {
+        return (
+            <div className="course-room-page">
+                <Header />
+                <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b' }}>Đang tải...</div>
+                <Footer />
+            </div>
+        );
+    }
 
     return (
         <div className="course-room-page">
@@ -251,9 +323,8 @@ export default function CourseRoom() {
                             <span className="cr-tab-badge">{completedCount}/{totalCount}</span>
                         )}
                     </button>
-                    <button className={`cr-tab ${tab === 'materials' ? 'active' : ''}`} onClick={() => setTab('materials')}>
-                        📁 Tài liệu
-                        {materials.length > 0 && <span className="cr-tab-badge">{materials.length}</span>}
+                    <button className={`cr-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>
+                        💬 Nhắn tin
                     </button>
                     {isStudent && (
                         <button className={`cr-tab ${tab === 'report' ? 'active' : ''}`} onClick={() => setTab('report')}>
@@ -261,17 +332,22 @@ export default function CourseRoom() {
                         </button>
                     )}
                     {isTutor && (
-                        <div className="cr-announcement-inline">
-                            <input
-                                type="text"
-                                value={announcement}
-                                onChange={e => setAnnouncement(e.target.value)}
-                                placeholder="📢 Gửi thông báo khẩn cho cả lớp..."
-                                onKeyDown={e => e.key === 'Enter' && sendAnnouncement()}
-                                className="cr-announcement-input"
-                            />
-                            <button className="cr-announcement-btn" onClick={sendAnnouncement}>Gửi</button>
-                        </div>
+                        <>
+                            <button className={`cr-tab ${tab === 'parent-report' ? 'active' : ''}`} onClick={() => setTab('parent-report')}>
+                                📊 Báo cáo PH
+                            </button>
+                            <div className="cr-announcement-inline">
+                                <input
+                                    type="text"
+                                    value={announcement}
+                                    onChange={e => setAnnouncement(e.target.value)}
+                                    placeholder="📢 Gửi thông báo khẩn cho cả lớp..."
+                                    onKeyDown={e => e.key === 'Enter' && sendAnnouncement()}
+                                    className="cr-announcement-input"
+                                />
+                                <button className="cr-announcement-btn" onClick={sendAnnouncement}>Gửi</button>
+                            </div>
+                        </>
                     )}
                 </div>
 
@@ -375,10 +451,22 @@ export default function CourseRoom() {
                                                                         }
                                                                         onClick={() => {
                                                                             if (!s.canConfirm || prevNotDone) return;
-                                                                            setLogModal({ open: true, session: s });
+                                                                            setLogModal({ open: true, session: s, isEdit: false });
                                                                             setLogNotes('');
                                                                         }}>
                                                                         ✅ Xác nhận đã dạy
+                                                                    </button>
+                                                                )}
+
+                                                                {/* Nút sửa nhật ký — chỉ hiện trong 24h sau khi xác nhận */}
+                                                                {s.isCompleted && (
+                                                                    <button
+                                                                        className="cr-btn-outline"
+                                                                        onClick={() => {
+                                                                            setLogModal({ open: true, session: s, isEdit: true });
+                                                                            setLogNotes(s.notes || '');
+                                                                        }}>
+                                                                        ✏️ Sửa nhật ký
                                                                     </button>
                                                                 )}
 
@@ -404,70 +492,84 @@ export default function CourseRoom() {
                             </div>
                         )}
 
-                        {/* ===== TAB: TÀI LIỆU ===== */}
-                        {tab === 'materials' && (
-                            <div>
-                                {/* Upload form cho Tutor */}
-                                {isTutor && (
-                                    <div className="cr-upload-box">
-                                        <h3>📤 Upload tài liệu mới</h3>
-                                        <div className="cr-upload-form">
-                                            <div className="cr-upload-field">
-                                                <label>Tiêu đề *</label>
-                                                <input value={uploadTitle} onChange={e => setUploadTitle(e.target.value)}
-                                                    placeholder="Ví dụ: Bài tập chương 1, Slide buổi 3..." />
-                                            </div>
-                                            <div className="cr-upload-field">
-                                                <label>File *</label>
-                                                <input id="file-upload" type="file"
-                                                    onChange={e => setUploadFile(e.target.files?.[0] || null)} />
-                                            </div>
-                                        </div>
-                                        <button className="cr-btn-primary" onClick={uploadMaterial}>
-                                            📤 Upload tài liệu
-                                        </button>
-                                    </div>
-                                )}
+                        {/* ===== TAB: CHAT ===== */}
+                        {tab === 'chat' && (
+                            <ChatBox courseId={courseId!} />
+                        )}
 
-                                {materials.length === 0 ? (
+                        {/* ===== TAB: BÁO CÁO PH (TUTOR) ===== */}
+                        {tab === 'parent-report' && isTutor && (
+                            <div className="cr-parent-report-box">
+                                <h2>📊 Gửi báo cáo học tập cho phụ huynh</h2>
+                                <p className="cr-parent-report-desc">
+                                    Hệ thống sẽ tự động tổng hợp tiến độ học tập (số buổi hoàn thành, nhật ký từng buổi)
+                                    và gửi email đến địa chỉ email đăng ký của học viên (dùng làm email phụ huynh).
+                                </p>
+
+                                {activeStudents.length === 0 ? (
                                     <div className="cr-empty">
-                                        <p>Chưa có tài liệu nào.</p>
-                                        {isTutor && <p style={{ fontSize: '0.88rem', color: '#94a3b8' }}>Upload tài liệu để học viên có thể tải về.</p>}
+                                        <p>Chưa có học viên nào đang học (ACTIVE) trong lớp này.</p>
+                                        <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                                            Học viên cần được duyệt và thanh toán học phí để có trạng thái ACTIVE.
+                                        </p>
                                     </div>
                                 ) : (
-                                    <div className="cr-materials">
-                                        {materials.map(m => (
-                                            <div key={m.id} className="cr-material-card">
-                                                <div className="cr-material-icon">{getFileIcon(m.fileType)}</div>
-                                                <div className="cr-material-info">
-                                                    <h4>{m.title}</h4>
-                                                    <p>
-                                                        {m.fileType?.split('/').pop()?.toUpperCase() || 'FILE'}
-                                                        {m.fileSize ? ` · ${(m.fileSize / 1024).toFixed(0)} KB` : ''}
-                                                        {' · '}📅 {m.createdAt?.slice(0, 10)}
-                                                    </p>
-                                                </div>
-                                                <div className="cr-material-actions">
-                                                    <a href={`http://localhost:8080/api/materials/download/${m.fileName}`}
-                                                        className="cr-btn-primary" target="_blank" rel="noreferrer">
-                                                        ⬇️ Tải xuống
-                                                    </a>
-                                                    {isTutor && (
-                                                        <button className="cr-btn-danger" onClick={() => deleteMaterial(m.id)}>
-                                                            🗑️
-                                                        </button>
-                                                    )}
-                                                </div>
+                                    <div className="cr-parent-report-form">
+                                        <div className="cr-form-group">
+                                            <label>Chọn học viên *</label>
+                                            <select
+                                                className="cr-select"
+                                                value={selectedRegId ?? ''}
+                                                onChange={e => setSelectedRegId(Number(e.target.value))}
+                                            >
+                                                {activeStudents.map(s => (
+                                                    <option key={s.registrationId} value={s.registrationId}>
+                                                        {s.studentName} ({s.studentEmail})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="cr-form-group">
+                                            <label>Nhận xét thêm của gia sư (tùy chọn)</label>
+                                            <textarea
+                                                rows={4}
+                                                className="cr-textarea"
+                                                value={parentReportNote}
+                                                onChange={e => setParentReportNote(e.target.value)}
+                                                placeholder="Ví dụ: Con học rất chăm chỉ, tiến bộ rõ rệt. Cần ôn thêm phần đạo hàm..."
+                                            />
+                                        </div>
+
+                                        <div className="cr-parent-report-preview">
+                                            <h4>📋 Nội dung báo cáo sẽ bao gồm:</h4>
+                                            <ul>
+                                                <li>✅ Tiến độ học tập: <strong>{completedCount}/{totalCount} buổi ({progressPct}%)</strong></li>
+                                                <li>📅 Chi tiết từng buổi học và nhật ký gia sư</li>
+                                                <li>💬 Nhận xét thêm của gia sư (nếu có)</li>
+                                            </ul>
+                                        </div>
+
+                                        {parentReportMsg && (
+                                            <div className={`cr-flash ${parentReportErr ? 'error' : 'success'}`} style={{ marginBottom: '1rem' }}>
+                                                {parentReportMsg}
                                             </div>
-                                        ))}
+                                        )}
+
+                                        <button
+                                            className="cr-btn-send-report"
+                                            onClick={sendParentReport}
+                                            disabled={sendingReport}
+                                        >
+                                            {sendingReport ? '⏳ Đang gửi...' : '📧 Gửi báo cáo cho phụ huynh'}
+                                        </button>
                                     </div>
                                 )}
                             </div>
                         )}
 
                         {/* ===== TAB: BÁO CÁO ===== */}
-                        {tab === 'report' && isStudent && (
-                            <div className="cr-report-box">
+                        {tab === 'report' && isStudent && (                            <div className="cr-report-box">
                                 <h2>🚨 Báo cáo vi phạm</h2>
                                 <p style={{ color: '#64748b', marginBottom: '1.5rem', fontSize: '0.92rem' }}>
                                     Nếu gia sư không dạy đúng cam kết, dạy sai nội dung hoặc có hành vi không phù hợp,
@@ -526,11 +628,13 @@ export default function CourseRoom() {
 
             {/* MODAL GHI NHẬT KÝ */}
             {logModal.open && logModal.session && (
-                <div className="cr-modal-overlay" onClick={() => setLogModal({ open: false, session: null })}>
+                <div className="cr-modal-overlay" onClick={() => setLogModal({ open: false, session: null, isEdit: false })}>
                     <div className="cr-modal" onClick={e => e.stopPropagation()}>
-                        <h3>✅ Xác nhận hoàn thành — {logModal.session.title}</h3>
+                        <h3>{logModal.isEdit ? '✏️ Sửa nhật ký' : '✅ Xác nhận hoàn thành'} — {logModal.session.title}</h3>
                         <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                            Ghi lại nội dung đã dạy trong buổi học này. Sau khi lưu, buổi học sẽ được đánh dấu hoàn thành.
+                            {logModal.isEdit
+                                ? 'Chỉnh sửa nội dung nhật ký. Chỉ được sửa trong vòng 24h sau khi xác nhận.'
+                                : 'Ghi lại nội dung đã dạy trong buổi học này. Sau khi lưu, buổi học sẽ được đánh dấu hoàn thành.'}
                         </p>
                         <div className="cr-form-group">
                             <label>Nội dung đã dạy *</label>
@@ -538,8 +642,10 @@ export default function CourseRoom() {
                                 placeholder="Ví dụ: Ôn tập chương 1 - Hàm số bậc hai. Giải 10 bài tập từ SGK. Học viên nắm được cách vẽ đồ thị..." />
                         </div>
                         <div className="cr-modal-actions">
-                            <button className="cr-btn-primary" onClick={saveLog}>✅ Xác nhận đã dạy xong</button>
-                            <button className="cr-btn-outline" onClick={() => setLogModal({ open: false, session: null })}>Hủy</button>
+                            <button className="cr-btn-primary" onClick={saveLog}>
+                                {logModal.isEdit ? '💾 Lưu chỉnh sửa' : '✅ Xác nhận đã dạy xong'}
+                            </button>
+                            <button className="cr-btn-outline" onClick={() => setLogModal({ open: false, session: null, isEdit: false })}>Hủy</button>
                         </div>
                     </div>
                 </div>

@@ -15,17 +15,40 @@ api.interceptors.request.use((config) => {
     return config;
 }, (error) => Promise.reject(error));
 
-// Chỉ redirect login khi 401 VÀ đang ở trang cần auth (không phải public)
+/** Kiểm tra token có hết hạn chưa */
+function isTokenExpired(): boolean {
+    const token = localStorage.getItem('token');
+    if (!token) return true;
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        // exp tính bằng giây, Date.now() tính bằng ms
+        return payload.exp * 1000 < Date.now();
+    } catch {
+        return true;
+    }
+}
+
+let redirecting = false; // tránh redirect nhiều lần cùng lúc
+
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         const url = error.config?.url || '';
-        const isPublic = url.includes('/public/') || url.includes('/auth/') || url.includes('/otp/');
+        const status = error.response?.status;
 
-        if (error.response?.status === 401 && !isPublic) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.replace('/login');
+        if (status === 401) {
+            console.warn('[401] URL bị từ chối:', url);
+
+            const isPublic = url.includes('/public/') || url.includes('/auth/') || url.includes('/otp/');
+
+            // Chỉ redirect khi token thực sự hết hạn, không phải lỗi permission
+            if (!isPublic && !redirecting && isTokenExpired()) {
+                redirecting = true;
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+                window.location.replace('/login');
+            }
         }
         return Promise.reject(error);
     }

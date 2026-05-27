@@ -33,41 +33,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        System.out.println(">>> FILTER RUN");
+        String token = null;
 
+        // 1. Ưu tiên đọc từ Authorization header
         String header = request.getHeader("Authorization");
-        System.out.println("HEADER: " + header);
-
         if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7);
-            System.out.println("TOKEN: " + token);
+            token = header.substring(7);
+        }
 
+        // 2. Fallback: đọc từ query param ?token= (dùng cho download file)
+        if (token == null) {
+            String queryToken = request.getParameter("token");
+            if (queryToken != null && !queryToken.isBlank()) {
+                token = queryToken;
+            }
+        }
+
+        if (token != null) {
             try {
                 String email = jwtUtil.extractEmail(token);
-                System.out.println("EMAIL: " + email);
-
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                System.out.println("AUTHORITIES: " + userDetails.getAuthorities());
-
                 boolean isValid = jwtUtil.isTokenValid(token, userDetails);
-                System.out.println("VALID: " + isValid);
 
                 if (email != null && isValid) {
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
+                                    userDetails, null, userDetails.getAuthorities()
                             );
-
                     authentication.setDetails(
                             new WebAuthenticationDetailsSource().buildDetails(request)
                     );
-
                     SecurityContextHolder.getContext().setAuthentication(authentication);
-                    System.out.println(">>> AUTH SET SUCCESS");
                 }
-
             } catch (Exception e) {
                 System.out.println("JWT ERROR: " + e.getMessage());
             }

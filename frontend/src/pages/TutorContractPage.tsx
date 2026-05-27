@@ -116,6 +116,14 @@ export default function TutorContractPage() {
         } catch (e) { flash('❌ Không tải được hợp đồng', true); }
     };
 
+    const downloadPdf = (id: number) => {
+        const token = localStorage.getItem('token');
+        window.open(
+            `http://localhost:8080/api/tutor/contracts/${id}/download-pdf?token=${token}`,
+            '_blank'
+        );
+    };
+
     return (
         <div className="dashboard-page">
             <Header />
@@ -169,8 +177,8 @@ export default function TutorContractPage() {
                                                     </button>
                                                 )}
                                                 {c.status === 'SIGNED' && (
-                                                    <button className="btn-sm btn-outline" onClick={() => downloadContract(c.id)}>
-                                                        ⬇️ Tải xuống
+                                                    <button className="btn-sm btn-primary" onClick={() => downloadPdf(c.id)}>
+                                                        📥 Tải PDF
                                                     </button>
                                                 )}
                                             </div>
@@ -239,7 +247,7 @@ export default function TutorContractPage() {
                                     </div>
                                 )}
                                 <div className="modal-actions">
-                                    <button className="btn-primary" onClick={() => downloadContract(viewModal.contract!.id)}>⬇️ Tải xuống</button>
+                                    <button className="btn-primary" onClick={() => downloadPdf(viewModal.contract!.id)}>📥 Tải PDF</button>
                                     <button className="btn-outline" onClick={() => setViewModal({ open: false, contract: null })}>Đóng</button>
                                 </div>
                             </div>

@@ -1,0 +1,127 @@
+/* ===== TUTOR PAYMENT PAGE ===== */
+
+/* Thẻ tóm tắt */
+.tp-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.tp-card {
+    border-radius: 16px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.tp-card-green  { background: linear-gradient(135deg, #d1fae5, #a7f3d0); border: 1px solid #6ee7b7; }
+.tp-card-orange { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #fcd34d; }
+.tp-card-purple { background: linear-gradient(135deg, #ede9fe, #ddd6fe); border: 1px solid #c4b5fd; }
+
+.tp-card-icon { font-size: 2rem; flex-shrink: 0; }
+.tp-card-body { flex: 1; }
+.tp-card-label { font-size: 0.82rem; font-weight: 600; color: #374151; margin: 0 0 4px; }
+.tp-card-value { font-size: 1.3rem; font-weight: 800; color: #1f2937; margin: 0 0 2px; }
+.tp-card-sub   { font-size: 0.75rem; color: #6b7280; margin: 0; }
+
+/* Section */
+.tp-section {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    border: 1px solid #f1f5f9;
+}
+.tp-section h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 1rem;
+}
+
+/* Đối soát phí */
+.tp-fee-row { display: flex; flex-direction: column; gap: 10px; }
+.tp-fee-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-radius: 10px;
+    flex-wrap: wrap;
+}
+.tp-fee-label  { flex: 1; font-size: 0.9rem; color: #374151; min-width: 200px; }
+.tp-fee-amount { font-size: 1rem; font-weight: 700; color: #1f2937; white-space: nowrap; }
+.tp-fee-status {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+.tp-fee-status.paid   { background: #d1fae5; color: #065f46; }
+.tp-fee-status.unpaid { background: #fef3c7; color: #92400e; }
+.tp-fee-status.info   { background: #dbeafe; color: #1d4ed8; }
+
+.tp-note {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #f0fdf4;
+    border-left: 3px solid #10b981;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.85rem;
+    color: #374151;
+    line-height: 1.6;
+}
+
+/* Thông tin ngân hàng */
+.tp-bank-display {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    border: 1px solid #e2e8f0;
+}
+.tp-bank-row {
+    display: flex;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+.tp-bank-row:last-of-type { border-bottom: none; }
+.tp-bank-row span { color: #64748b; min-width: 140px; }
+.tp-bank-row strong { color: #1f2937; }
+
+.tp-bank-empty {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.tp-bank-empty p { margin: 0; color: #92400e; font-size: 0.9rem; flex: 1; }
+
+/* Form ngân hàng */
+.tp-bank-form {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    border: 1px solid #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 500px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .tp-cards { grid-template-columns: 1fr; }
+    .tp-fee-item { flex-direction: column; align-items: flex-start; }
+}

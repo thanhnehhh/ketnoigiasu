@@ -48,15 +48,15 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/tutor/**", "/api/courses/my-courses").hasAnyRole("TUTOR", "ADMIN")
-                        .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/tutor-profiles/**").hasAnyRole("STUDENT", "TUTOR", "ADMIN")
+                        .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN")                        .requestMatchers(HttpMethod.GET, "/api/tutor-profiles/**").hasAnyRole("STUDENT", "TUTOR", "ADMIN")
                         .requestMatchers("/api/complaints/**").hasRole("TUTOR")
                         .requestMatchers("/api/profile/**").authenticated()
                         .requestMatchers("/api/reviews/**").hasRole("STUDENT")
                         .requestMatchers(HttpMethod.POST, "/api/materials/tutor/upload").hasRole("TUTOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/materials/**").hasRole("TUTOR")
-                        .requestMatchers(HttpMethod.GET, "/api/materials/course/**").authenticated() // Học viên và gia sư đều xem được
+                        .requestMatchers(HttpMethod.GET, "/api/materials/course/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/materials/download/**").authenticated()
+                        .requestMatchers("/api/messages/**").authenticated() // Chat — cả tutor lẫn student
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

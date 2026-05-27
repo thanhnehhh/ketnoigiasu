@@ -471,3 +471,15 @@
 @media (max-width: 600px) {
     .profile-grid { grid-template-columns: 1fr; }
 }
+
+/* Tên khóa học — click sang CourseDetail */
+.reg-title-link {
+    color: #1f2937;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.15s;
+}
+.reg-title-link:hover {
+    color: #4f46e5;
+    text-decoration: underline;
+}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -10,26 +11,37 @@ interface Payment { id: number; userFullName: string; email: string; amount: num
 interface Report { id: number; studentName: string; tutorName: string; title: string; content: string; status: string; createdAt: string; registrationId: number; }
 interface Complaint { id: number; tutorName: string; reviewId: number; reason: string; status: string; createdAt: string; }
 interface Contract { id: number; tutorId: number; tutorName: string; tutorEmail: string; contentSnapshot: string; status: string; signedAt: string | null; createdAt: string; }
+interface RefundRequest { id: number; paymentId: number; courseTitle: string; amount: number; studentName: string; reason: string; evidenceUrl: string; status: string; adminNote: string | null; createdAt: string; }
+interface FinanceSummary { totalTuition: number; totalPlatformFee: number; totalPromote: number; platformPercentFee: number; totalRevenue: number; pendingPaymentCount: number; }
 
-type AdminTab = 'overview' | 'courses' | 'payments' | 'reports' | 'complaints' | 'contracts';
+type AdminTab = 'overview' | 'courses' | 'payments' | 'finance' | 'reports' | 'complaints' | 'contracts';
 
 // ===== STAT CARD COMPONENT =====
-function StatCard({ icon, label, value, sub, color }: { icon: string; label: string; value: string | number; sub?: string; color: string }) {
+function StatCard({ icon, label, value, sub, color, onClick }: { icon: string; label: string; value: string | number; sub?: string; color: string; onClick?: () => void }) {
     return (
-        <div style={{
-            background: 'white', borderRadius: '16px', padding: '1.5rem',
+        <div onClick={onClick} style={{
+            background: 'white', borderRadius: '16px', padding: '1.25rem',
             boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9',
-            display: 'flex', alignItems: 'center', gap: '1rem'
-        }}>
+            display: 'flex', alignItems: 'center', gap: '0.75rem',
+            cursor: onClick ? 'pointer' : 'default',
+            transition: 'box-shadow 0.2s, border-color 0.2s',
+            minWidth: 0,
+        }}
+        onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(79,70,229,0.13)'; (e.currentTarget as HTMLDivElement).style.borderColor = '#c7d2fe'; } }}
+        onMouseLeave={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'; (e.currentTarget as HTMLDivElement).style.borderColor = '#f1f5f9'; } }}
+        >
             <div style={{
-                width: 52, height: 52, borderRadius: '14px', background: color,
+                width: 48, height: 48, borderRadius: '12px', background: color,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.5rem', flexShrink: 0
+                fontSize: '1.4rem', flexShrink: 0
             }}>{icon}</div>
-            <div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1f2937', lineHeight: 1.1 }}>{value}</div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#374151', marginTop: '2px' }}>{label}</div>
-                {sub && <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>{sub}</div>}
+            <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{
+                    fontSize: '1.3rem', fontWeight: 800, color: '#1f2937', lineHeight: 1.2,
+                    wordBreak: 'break-all', overflowWrap: 'anywhere'
+                }}>{value}</div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginTop: '2px' }}>{label}</div>
+                {sub && <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>{sub}</div>}
             </div>
         </div>
     );
@@ -37,13 +49,22 @@ function StatCard({ icon, label, value, sub, color }: { icon: string; label: str
 
 export default function AdminDashboard() {
     const { user, logout } = useAuth();
-    const [tab, setTab] = useState<AdminTab>('overview');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tab = (searchParams.get('tab') as AdminTab) || 'overview';
+    const setTab = (t: AdminTab) => setSearchParams({ tab: t });
     const [courses, setCourses] = useState<Course[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [reports, setReports] = useState<Report[]>([]);
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
-    const [allPayments, setAllPayments] = useState<Payment[]>([]); // tất cả payment để tính doanh thu
+    const [allPayments, setAllPayments] = useState<Payment[]>([]);
+    const [refunds, setRefunds] = useState<RefundRequest[]>([]);
+    const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
+    const [pendingTransfers, setPendingTransfers] = useState<Payment[]>([]);
+    const [transferHistory, setTransferHistory] = useState<Payment[]>([]);
+    const [transferModal, setTransferModal] = useState<{ open: boolean; payment: Payment | null }>({ open: false, payment: null });
+    const [transferProof, setTransferProof] = useState<File | null>(null);
+    const [transferring, setTransferring] = useState(false);
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState('');
     const [isErr, setIsErr] = useState(false);
@@ -69,26 +90,36 @@ export default function AdminDashboard() {
 
     // Modal xem nhật ký
     const [logModal, setLogModal] = useState<{ open: boolean; data: any }>({ open: false, data: null });
+    // Modal xử lý hoàn tiền
+    const [refundModal, setRefundModal] = useState<{ open: boolean; refund: RefundRequest | null }>({ open: false, refund: null });
+    const [refundNote, setRefundNote] = useState('');
 
     useEffect(() => { fetchAll(); }, []);
 
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [cRes, pRes, rRes, cmpRes, conRes, allPayRes] = await Promise.all([
+            const [cRes, pRes, rRes, cmpRes, conRes, refundRes, finRes, transferRes, histRes] = await Promise.all([
                 api.get('/admin/courses'),
                 api.get('/admin/payments/pending'),
                 api.get('/admin/interactions/reports'),
                 api.get('/admin/interactions/complaints'),
                 api.get('/admin/contracts/all'),
-                api.get('/admin/payments/pending'), // dùng lại pending để tính
+                api.get('/admin/payments/refunds/pending'),
+                api.get('/admin/payments/finance-summary'),
+                api.get('/admin/payments/pending-transfer'),
+                api.get('/admin/payments/transfer-history'),
             ]);
             setCourses(cRes.data);
             setPayments(pRes.data);
             setReports(rRes.data);
             setComplaints(cmpRes.data);
             setContracts(conRes.data);
-            setAllPayments(allPayRes.data);
+            setRefunds(refundRes.data);
+            setFinanceSummary(finRes.data);
+            setPendingTransfers(transferRes.data);
+            setTransferHistory(histRes.data);
+            setAllPayments(pRes.data);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     };
@@ -96,6 +127,14 @@ export default function AdminDashboard() {
     const flash = (text: string, err = false) => {
         setMsg(text); setIsErr(err);
         setTimeout(() => setMsg(''), 3000);
+    };
+
+    // Format số gọn: 48.000.000 → 48 triệu, 4.800.000 → 4,8 triệu
+    const fmtShort = (n: number): string => {
+        if (!n) return '0đ';
+        if (n >= 1_000_000) return (n / 1_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' triệu đ';
+        if (n >= 1_000) return (n / 1_000).toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' nghìn đ';
+        return n.toLocaleString('vi-VN') + 'đ';
     };
 
     // Courses
@@ -136,6 +175,33 @@ export default function AdminDashboard() {
         flash(accept ? '✅ Đã chấp nhận — review đã bị gỡ' : '✅ Đã từ chối khiếu nại'); fetchAll();
     };
 
+    // Refunds
+    const resolveRefund = async (id: number, action: 'APPROVED' | 'REJECTED') => {
+        try {
+            await api.put(`/admin/payments/refunds/${id}/resolve`, { action, adminNote: refundNote });
+            flash(action === 'APPROVED' ? '✅ Đã duyệt hoàn tiền, quyền truy cập lớp đã thu hồi' : '✅ Đã từ chối yêu cầu hoàn tiền');
+            setRefundModal({ open: false, refund: null });
+            setRefundNote('');
+            fetchAll();
+        } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
+    };
+
+    const markTransferred = async () => {
+        if (!transferModal.payment) return;
+        setTransferring(true);
+        try {
+            const formData = new FormData();
+            if (transferProof) formData.append('proof', transferProof);
+            await api.post(`/admin/payments/${transferModal.payment.id}/mark-transferred`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            flash('✅ Đã xác nhận chuyển tiền thành công!');
+            setTransferModal({ open: false, payment: null });
+            setTransferProof(null);
+            fetchAll();
+        } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
+        finally { setTransferring(false); }
+    };
     // Contracts
     const issueContract = async () => {
         if (!issueTutorId.trim()) { setIssueMsg('Vui lòng nhập Tutor Profile ID'); return; }
@@ -211,6 +277,10 @@ export default function AdminDashboard() {
                             💳 Duyệt thanh toán
                             {payments.length > 0 && <span className="badge">{payments.length}</span>}
                         </button>
+                        <button className={tab === 'finance' ? 'active' : ''} onClick={() => setTab('finance')}>
+                            💰 Quản lý tài chính
+                            {refunds.length > 0 && <span className="badge" style={{ background: '#f59e0b' }}>{refunds.length}</span>}
+                        </button>
                         <button className={tab === 'contracts' ? 'active' : ''} onClick={() => setTab('contracts')}>
                             📄 Hợp đồng
                             {pendingContracts.length > 0 && <span className="badge" style={{ background: '#f59e0b' }}>{pendingContracts.length}</span>}
@@ -276,19 +346,25 @@ export default function AdminDashboard() {
                                         <h2 className="dash-title">Tổng quan hệ thống</h2>
 
                                         {/* STAT CARDS */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                                             <StatCard icon="📚" label="Tổng khóa học" value={totalCourses}
-                                                sub={`${approvedCourses} đã duyệt · ${pendingCourseCount} chờ duyệt`} color="#ede9fe" />
+                                                sub={`${approvedCourses} đã duyệt · ${pendingCourseCount} chờ duyệt`} color="#ede9fe"
+                                                onClick={() => setTab('courses')} />
                                             <StatCard icon="📄" label="Hợp đồng" value={contracts.length}
-                                                sub={`${signedContracts} đã ký · ${pendingContracts} chờ ký`} color="#dbeafe" />
+                                                sub={`${signedContracts} đã ký · ${pendingContracts} chờ ký`} color="#dbeafe"
+                                                onClick={() => setTab('contracts')} />
                                             <StatCard icon="💳" label="Thanh toán chờ duyệt" value={pendingPayCount}
-                                                sub="Cần xác nhận minh chứng" color="#fef3c7" />
+                                                sub="Cần xác nhận minh chứng" color="#fef3c7"
+                                                onClick={() => setTab('payments')} />
                                             <StatCard icon="🚨" label="Báo cáo vi phạm" value={reports.length}
-                                                sub={`${pendingReports} chờ xử lý · ${resolvedReports} đã xử lý`} color="#fee2e2" />
+                                                sub={`${pendingReports} chờ xử lý · ${resolvedReports} đã xử lý`} color="#fee2e2"
+                                                onClick={() => setTab('reports')} />
                                             <StatCard icon="📣" label="Khiếu nại review" value={complaints.length}
-                                                sub={`${pendingComplaints} chờ xử lý`} color="#fce7f3" />
+                                                sub={`${pendingComplaints} chờ xử lý`} color="#fce7f3"
+                                                onClick={() => setTab('complaints')} />
                                             <StatCard icon="🙈" label="Khóa học bị ẩn" value={hiddenCourses}
-                                                sub="Do vi phạm chính sách" color="#f3f4f6" />
+                                                sub="Do vi phạm chính sách" color="#f3f4f6"
+                                                onClick={() => setTab('courses')} />
                                         </div>
 
                                         {/* VIỆC CẦN LÀM NGAY */}
@@ -493,9 +569,157 @@ export default function AdminDashboard() {
                                 </div>
                             )}
 
-                            {/* HỢP ĐỒNG */}
-                            {tab === 'contracts' && (
+                            {/* QUẢN LÝ TÀI CHÍNH */}
+                            {tab === 'finance' && (
                                 <div>
+                                    <h2 className="dash-title">💰 Quản lý tài chính</h2>
+
+                                    {/* Thống kê tổng quan */}
+                                    {financeSummary && (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                                            <StatCard icon="🎓" label="Tổng học phí thu"
+                                                value={fmtShort(financeSummary.totalTuition)}
+                                                sub="Học viên đã thanh toán" color="#d1fae5"
+                                                onClick={() => document.getElementById('section-transfer')?.scrollIntoView({ behavior: 'smooth' })} />
+                                            <StatCard icon="📉" label="Phí % sàn (10%)"
+                                                value={fmtShort(financeSummary.platformPercentFee)}
+                                                sub="Khấu trừ từ học phí" color="#fef3c7" />
+                                            <StatCard icon="💵" label="Phí đăng ký sàn"
+                                                value={fmtShort(financeSummary.totalPlatformFee)}
+                                                sub="Gia sư đã nộp" color="#dbeafe"
+                                                onClick={() => setTab('payments')} />
+                                            <StatCard icon="🔥" label="Phí đẩy tin"
+                                                value={fmtShort(financeSummary.totalPromote)}
+                                                sub="Từ quảng cáo khóa học" color="#fce7f3" />
+                                            <StatCard icon="🏆" label="Tổng doanh thu sàn"
+                                                value={fmtShort(financeSummary.totalRevenue)}
+                                                sub="Phí % + phí sàn + đẩy tin" color="#ede9fe" />
+                                            <StatCard icon="⏳" label="Chờ xác nhận"
+                                                value={financeSummary.pendingPaymentCount}
+                                                sub="Minh chứng chưa duyệt" color="#f3f4f6"
+                                                onClick={() => setTab('payments')} />
+                                        </div>
+                                    )}
+
+                                    {/* Chuyển tiền học phí cho gia sư */}
+                                    <div id="section-transfer" style={{ marginBottom: '1rem', marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                                            💸 Chuyển tiền học phí cho gia sư
+                                        </h3>
+                                        {pendingTransfers.length > 0 && (
+                                            <span className="status-badge" style={{ background: '#3b82f6' }}>{pendingTransfers.length} chưa chuyển</span>
+                                        )}
+                                    </div>
+                                    {pendingTransfers.length === 0 ? (
+                                        <div className="empty-state" style={{ marginBottom: '2rem' }}><p>Tất cả học phí đã được chuyển cho gia sư.</p></div>
+                                    ) : (
+                                        <div className="card-list" style={{ marginBottom: '2rem' }}>
+                                            {pendingTransfers.map(p => {
+                                                const net = p.amount * 0.9;
+                                                const fee = p.amount * 0.1;
+                                                return (
+                                                    <div key={p.id} className="reg-card">
+                                                        <div className="reg-card-header">
+                                                            <h3>🎓 {p.courseTitle || 'Học phí'}</h3>
+                                                            <span className="status-badge" style={{ background: '#3b82f6' }}>Chưa chuyển</span>
+                                                        </div>
+                                                        <p>👤 Học viên: <strong>{p.userFullName}</strong></p>
+                                                        <p>💰 Học phí: <strong>{p.amount?.toLocaleString('vi-VN')}đ</strong></p>
+                                                        <p>📉 Khấu trừ phí sàn (10%): <strong style={{ color: '#f59e0b' }}>-{fee.toLocaleString('vi-VN')}đ</strong></p>
+                                                        <p>🏆 Thực chuyển cho gia sư: <strong style={{ color: '#10b981' }}>{net.toLocaleString('vi-VN')}đ</strong></p>
+                                                        {p.tutorBankAccount ? (
+                                                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 12px', margin: '8px 0', fontSize: '0.85rem' }}>
+                                                                🏦 {p.tutorBankName} — <strong>{p.tutorBankAccount}</strong> ({p.tutorBankOwner})
+                                                            </div>
+                                                        ) : (
+                                                            <p style={{ color: '#f59e0b', fontSize: '0.85rem' }}>⚠️ Gia sư chưa cập nhật tài khoản ngân hàng</p>
+                                                        )}
+                                                        <div className="reg-actions">
+                                                            <button className="btn-sm btn-primary" onClick={() => { setTransferModal({ open: true, payment: p }); setTransferProof(null); }}>
+                                                                💸 Chuyển tiền & Upload minh chứng
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Lịch sử đã chuyển tiền */}
+                                    {transferHistory.length > 0 && (
+                                        <div style={{ marginBottom: '2rem' }}>
+                                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1f2937', margin: '0 0 1rem' }}>
+                                                📋 Lịch sử đã chuyển tiền ({transferHistory.length})
+                                            </h3>
+                                            <div className="card-list">
+                                                {transferHistory.map(p => (
+                                                    <div key={p.id} className="reg-card">
+                                                        <div className="reg-card-header">
+                                                            <h3>✅ {p.courseTitle}</h3>
+                                                            <span className="status-badge" style={{ background: '#10b981' }}>Đã chuyển</span>
+                                                        </div>
+                                                        <p>👤 Học viên: <strong>{p.userFullName}</strong></p>
+                                                        <p>💰 Học phí: <strong>{p.amount?.toLocaleString('vi-VN')}đ</strong>
+                                                            &nbsp;→&nbsp; Thực chuyển: <strong style={{ color: '#10b981' }}>{(p.amount * 0.9).toLocaleString('vi-VN')}đ</strong>
+                                                        </p>
+                                                        {p.tutorBankAccount && (
+                                                            <p>🏦 {p.tutorBankName} — <strong>{p.tutorBankAccount}</strong></p>
+                                                        )}
+                                                        {p.transferredAt && (
+                                                            <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                                                                📅 Chuyển lúc: {new Date(p.transferredAt).toLocaleString('vi-VN')}
+                                                            </p>
+                                                        )}
+                                                        {p.transferProofUrl && (
+                                                            <p>🖼️ <a href={`http://localhost:8080${p.transferProofUrl}`} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Phê duyệt hoàn tiền */}
+                                    <div style={{ marginBottom: '1rem', marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                                            🔄 Yêu cầu hoàn tiền đang chờ
+                                        </h3>
+                                        {refunds.length > 0 && (
+                                            <span className="status-badge" style={{ background: '#f59e0b' }}>{refunds.length} chờ xử lý</span>
+                                        )}
+                                    </div>
+                                    {refunds.length === 0 ? (
+                                        <div className="empty-state"><p>Không có yêu cầu hoàn tiền nào đang chờ.</p></div>
+                                    ) : (
+                                        <div className="card-list">
+                                            {refunds.map(r => (
+                                                <div key={r.id} className="reg-card">
+                                                    <div className="reg-card-header">
+                                                        <h3>🔄 Hoàn tiền #{r.id} — {r.courseTitle}</h3>
+                                                        <span className="status-badge" style={{ background: '#f59e0b' }}>⏳ Chờ xử lý</span>
+                                                    </div>
+                                                    <p>👤 Học viên: <strong>{r.studentName}</strong></p>
+                                                    <p>💰 Số tiền: <strong>{r.amount?.toLocaleString('vi-VN')}đ</strong></p>
+                                                    <p>📝 Lý do: {r.reason}</p>
+                                                    {r.evidenceUrl && (
+                                                        <p>🖼️ Minh chứng: <a href={r.evidenceUrl} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
+                                                    )}
+                                                    <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>📅 {new Date(r.createdAt).toLocaleString('vi-VN')}</p>
+                                                    <div className="reg-actions">
+                                                        <button className="btn-sm btn-primary"
+                                                            onClick={() => { setRefundModal({ open: true, refund: r }); setRefundNote(''); }}>
+                                                            ⚖️ Xử lý yêu cầu
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* HỢP ĐỒNG */}
+                            {tab === 'contracts' && (                                <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                         <h2 className="dash-title" style={{ margin: 0 }}>Quản lý hợp đồng</h2>
                                         <button className="btn-primary" onClick={() => { setIssueModal(true); setIssueMsg(''); setIssueTutorId(''); }}>
@@ -602,6 +826,81 @@ export default function AdminDashboard() {
                     )}
                 </main>
             </div>
+
+            {/* MODAL CHUYỂN TIỀN + UPLOAD MINH CHỨNG */}
+            {transferModal.open && transferModal.payment && (
+                <div className="modal-overlay" onClick={() => setTransferModal({ open: false, payment: null })}>
+                    <div className="modal-box" onClick={e => e.stopPropagation()}>
+                        <h3>💸 Xác nhận chuyển tiền cho gia sư</h3>
+                        <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px 16px', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                            <p style={{ margin: '2px 0' }}>📚 Khóa học: <strong>{transferModal.payment.courseTitle}</strong></p>
+                            <p style={{ margin: '2px 0' }}>👤 Học viên: <strong>{transferModal.payment.userFullName}</strong></p>
+                            <p style={{ margin: '2px 0' }}>💰 Học phí: <strong>{transferModal.payment.amount?.toLocaleString('vi-VN')}đ</strong></p>
+                            <p style={{ margin: '2px 0' }}>📉 Khấu trừ 10%: <strong style={{ color: '#f59e0b' }}>-{(transferModal.payment.amount * 0.1).toLocaleString('vi-VN')}đ</strong></p>
+                            <p style={{ margin: '2px 0' }}>🏆 Thực chuyển: <strong style={{ color: '#10b981', fontSize: '1rem' }}>{(transferModal.payment.amount * 0.9).toLocaleString('vi-VN')}đ</strong></p>
+                            {transferModal.payment.tutorBankAccount && (
+                                <div style={{ marginTop: '8px', padding: '8px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                    🏦 {transferModal.payment.tutorBankName} — <strong>{transferModal.payment.tutorBankAccount}</strong> ({transferModal.payment.tutorBankOwner})
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-form">
+                            <label>📎 Upload minh chứng chuyển khoản (tùy chọn)</label>
+                            <input type="file" accept="image/*,.pdf"
+                                onChange={e => setTransferProof(e.target.files?.[0] || null)}
+                                style={{ padding: '8px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem' }} />
+                            {transferProof && (
+                                <p style={{ fontSize: '0.82rem', color: '#10b981', marginTop: '4px' }}>
+                                    ✅ Đã chọn: {transferProof.name}
+                                </p>
+                            )}
+                        </div>
+                        <div className="modal-actions" style={{ marginTop: '1rem' }}>
+                            <button className="btn-primary" onClick={markTransferred} disabled={transferring}>
+                                {transferring ? '⏳ Đang xử lý...' : '✅ Xác nhận đã chuyển tiền'}
+                            </button>
+                            <button className="btn-outline" onClick={() => setTransferModal({ open: false, payment: null })}>Hủy</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL XỬ LÝ HOÀN TIỀN */}
+            {refundModal.open && refundModal.refund && (
+                <div className="modal-overlay" onClick={() => setRefundModal({ open: false, refund: null })}>
+                    <div className="modal-box" onClick={e => e.stopPropagation()}>
+                        <h3>⚖️ Xử lý yêu cầu hoàn tiền #{refundModal.refund.id}</h3>
+                        <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px 16px', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                            <p style={{ margin: '2px 0' }}>👤 Học viên: <strong>{refundModal.refund.studentName}</strong></p>
+                            <p style={{ margin: '2px 0' }}>📚 Khóa học: <strong>{refundModal.refund.courseTitle}</strong></p>
+                            <p style={{ margin: '2px 0' }}>💰 Số tiền: <strong>{refundModal.refund.amount?.toLocaleString('vi-VN')}đ</strong></p>
+                            <p style={{ margin: '2px 0' }}>📝 Lý do: {refundModal.refund.reason}</p>
+                            {refundModal.refund.evidenceUrl && (
+                                <p style={{ margin: '2px 0' }}>🖼️ <a href={refundModal.refund.evidenceUrl} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
+                            )}
+                        </div>
+                        <div className="modal-form">
+                            <label>Ghi chú cho học viên</label>
+                            <textarea className="modal-input" rows={3}
+                                value={refundNote}
+                                onChange={e => setRefundNote(e.target.value)}
+                                placeholder="Ví dụ: Đã xác minh, tiền sẽ được chuyển trong 3-5 ngày..." />
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: '#f59e0b', margin: '8px 0' }}>
+                            ⚠️ Nếu duyệt: quyền truy cập lớp học của học viên sẽ bị thu hồi ngay lập tức.
+                        </p>
+                        <div className="modal-actions">
+                            <button className="btn-primary" onClick={() => resolveRefund(refundModal.refund!.id, 'APPROVED')}>
+                                ✅ Duyệt hoàn tiền
+                            </button>
+                            <button className="btn-danger" onClick={() => resolveRefund(refundModal.refund!.id, 'REJECTED')}>
+                                ❌ Từ chối
+                            </button>
+                            <button className="btn-outline" onClick={() => setRefundModal({ open: false, refund: null })}>Hủy</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL PHÁT HÀNH HỢP ĐỒNG */}
             {issueModal && (
