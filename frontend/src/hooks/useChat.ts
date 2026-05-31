@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 import api from '../services/api';
 
 export interface ChatMessage {
@@ -35,13 +36,13 @@ export function useChat(courseId: string | undefined) {
         if (!token) return;
 
         const client = new Client({
-            // Dùng SockJS load từ CDN qua window.SockJS
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            webSocketFactory: () => new (window as any).SockJS('http://localhost:8080/ws'),
+            webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
             connectHeaders: {
                 Authorization: `Bearer ${token}`,
             },
-            reconnectDelay: 3000,
+            reconnectDelay: 5000,
+            heartbeatIncoming: 10000,
+            heartbeatOutgoing: 10000,
             onConnect: () => {
                 setConnected(true);
                 // Subscribe nhận tin nhắn của lớp này
@@ -71,12 +72,29 @@ export function useChat(courseId: string | undefined) {
     }, [courseId]);
 
     // Gửi tin nhắn text hoặc bài tập
-    const sendText = useCallback((content: string, type: 'TEXT' | 'EXERCISE' = 'TEXT') => {
-        if (!clientRef.current?.connected || !courseId) return;
-        clientRef.current.publish({
-            destination: `/app/chat/${courseId}`,
-            body: JSON.stringify({ content, type }),
-        });
+    // Nếu WebSocket đã kết nối → gửi real-time
+    // Nếu chưa kết nối → gửi qua REST (lưu DB, người kia nhận khi reload)
+    const sendText = useCallback(async (content: string, type: 'TEXT' | 'EXERCISE' = 'TEXT') => {
+        if (!courseId) return;
+        if (clientRef.current?.connected) {
+            // Real-time qua WebSocket
+            clientRef.current.publish({
+                destination: `/app/chat/${courseId}`,
+                body: JSON.stringify({ content, type }),
+            });
+        } else {
+            // Fallback: gửi qua REST
+            try {
+                const res = await api.post(`/messages/course/${courseId}/text`, { content, type });
+                // Thêm vào local state để hiển thị ngay
+                setMessages(prev => {
+                    if (prev.some(m => m.id === res.data.id)) return prev;
+                    return [...prev, res.data];
+                });
+            } catch (e) {
+                console.error('Gửi tin nhắn thất bại:', e);
+            }
+        }
     }, [courseId]);
 
     // Gửi file qua REST (multipart không qua WebSocket)

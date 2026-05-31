@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
-import api from '../services/api';
+import api, { toFullUrl } from '../services/api';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../css/Dashboard.css';
 
 interface Course { id: number; title: string; tutorName: string; tutorProfileId: number; status: string; subjectName: string; createdAt: string; }
-interface Payment { id: number; userFullName: string; email: string; amount: number; paymentType: string; status: string; proofImageUrl: string; courseTitle: string; createdAt: string; }
+interface Payment { id: number; userFullName: string; email: string; amount: number; paymentType: string; status: string; proofImageUrl: string; courseTitle: string; createdAt: string; verifiedAt: string | null; tutorBankName: string | null; tutorBankAccount: string | null; tutorBankOwner: string | null; transferredToTutor: boolean; transferredAt: string | null; transferProofUrl: string | null; }
 interface Report { id: number; studentName: string; tutorName: string; title: string; content: string; status: string; createdAt: string; registrationId: number; }
 interface Complaint { id: number; tutorName: string; reviewId: number; reason: string; status: string; createdAt: string; }
 interface Contract { id: number; tutorId: number; tutorName: string; tutorEmail: string; contentSnapshot: string; status: string; signedAt: string | null; createdAt: string; }
 interface RefundRequest { id: number; paymentId: number; courseTitle: string; amount: number; studentName: string; reason: string; evidenceUrl: string; status: string; adminNote: string | null; createdAt: string; }
-interface FinanceSummary { totalTuition: number; totalPlatformFee: number; totalPromote: number; platformPercentFee: number; totalRevenue: number; pendingPaymentCount: number; }
+interface FinanceSummary { totalTuition: number; totalPlatformFee: number; totalPromote: number; platformPercentFee: number; totalRevenue: number; pendingPaymentCount: number; activeStudents: number; activeTutors: number; }
 
 type AdminTab = 'overview' | 'courses' | 'payments' | 'finance' | 'reports' | 'complaints' | 'contracts';
 
@@ -556,7 +556,7 @@ export default function AdminDashboard() {
                                                     {p.courseTitle && <p>📚 Khóa học: {p.courseTitle}</p>}
                                                     <p>💰 <strong>{p.amount?.toLocaleString('vi-VN')}đ</strong></p>
                                                     {p.proofImageUrl && (
-                                                        <p>🖼️ Minh chứng: <a href={p.proofImageUrl} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem ảnh</a></p>
+                                                        <p>🖼️ Minh chứng: <a href={toFullUrl(p.proofImageUrl)} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem ảnh</a></p>
                                                     )}
                                                     <p>📅 {new Date(p.createdAt).toLocaleString('vi-VN')}</p>
                                                     <div className="reg-actions">
@@ -598,6 +598,12 @@ export default function AdminDashboard() {
                                                 value={financeSummary.pendingPaymentCount}
                                                 sub="Minh chứng chưa duyệt" color="#f3f4f6"
                                                 onClick={() => setTab('payments')} />
+                                            <StatCard icon="👨‍🎓" label="Học viên đang học"
+                                                value={financeSummary.activeStudents}
+                                                sub="Đăng ký ACTIVE" color="#d1fae5" />
+                                            <StatCard icon="👨‍🏫" label="Gia sư hoạt động"
+                                                value={financeSummary.activeTutors}
+                                                sub="Đã nộp phí sàn" color="#dbeafe" />
                                         </div>
                                     )}
 
@@ -671,7 +677,7 @@ export default function AdminDashboard() {
                                                             </p>
                                                         )}
                                                         {p.transferProofUrl && (
-                                                            <p>🖼️ <a href={`http://localhost:8080${p.transferProofUrl}`} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
+                                                            <p>🖼️ <a href={toFullUrl(p.transferProofUrl)} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
                                                         )}
                                                     </div>
                                                 ))}
@@ -702,7 +708,7 @@ export default function AdminDashboard() {
                                                     <p>💰 Số tiền: <strong>{r.amount?.toLocaleString('vi-VN')}đ</strong></p>
                                                     <p>📝 Lý do: {r.reason}</p>
                                                     {r.evidenceUrl && (
-                                                        <p>🖼️ Minh chứng: <a href={r.evidenceUrl} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
+                                                        <p>🖼️ Minh chứng: <a href={toFullUrl(r.evidenceUrl)} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
                                                     )}
                                                     <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>📅 {new Date(r.createdAt).toLocaleString('vi-VN')}</p>
                                                     <div className="reg-actions">
@@ -876,7 +882,7 @@ export default function AdminDashboard() {
                             <p style={{ margin: '2px 0' }}>💰 Số tiền: <strong>{refundModal.refund.amount?.toLocaleString('vi-VN')}đ</strong></p>
                             <p style={{ margin: '2px 0' }}>📝 Lý do: {refundModal.refund.reason}</p>
                             {refundModal.refund.evidenceUrl && (
-                                <p style={{ margin: '2px 0' }}>🖼️ <a href={refundModal.refund.evidenceUrl} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
+                                <p style={{ margin: '2px 0' }}>🖼️ <a href={toFullUrl(refundModal.refund.evidenceUrl)} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
                             )}
                         </div>
                         <div className="modal-form">

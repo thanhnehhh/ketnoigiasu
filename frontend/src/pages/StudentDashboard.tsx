@@ -79,13 +79,14 @@ export default function StudentDashboard() {
 
     // Modal nộp proof
     const [proofModal, setProofModal] = useState<{ open: boolean; paymentId: number | null }>({ open: false, paymentId: null });
-    const [proofUrl, setProofUrl] = useState('');
+    const [proofFile, setProofFile] = useState<File | null>(null);
     const [proofMsg, setProofMsg] = useState('');
+    const [submittingProof, setSubmittingProof] = useState(false);
 
     // Modal yêu cầu hoàn tiền
     const [refundModal, setRefundModal] = useState<{ open: boolean; payment: Payment | null }>({ open: false, payment: null });
     const [refundReason, setRefundReason] = useState('');
-    const [refundEvidence, setRefundEvidence] = useState('');
+    const [refundEvidenceFile, setRefundEvidenceFile] = useState<File | null>(null);
     const [refundMsg, setRefundMsg] = useState('');
     const [submittingRefund, setSubmittingRefund] = useState(false);
 
@@ -132,29 +133,36 @@ export default function StudentDashboard() {
     };
 
     const submitProof = async () => {
-        if (!proofUrl.trim()) { setProofMsg('Vui lòng nhập URL minh chứng'); return; }
+        if (!proofFile) { setProofMsg('Vui lòng chọn ảnh minh chứng'); return; }
+        setSubmittingProof(true);
         try {
-            await api.put(`/payments/${proofModal.paymentId}/submit-proof`, { proofImageUrl: proofUrl });
+            const formData = new FormData();
+            formData.append('proof', proofFile);
+            await api.put(`/payments/${proofModal.paymentId}/submit-proof`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
             setProofMsg('✅ Đã nộp minh chứng thành công! Chờ Admin duyệt.');
-            setProofUrl('');
+            setProofFile(null);
             fetchAll();
         } catch (e: any) {
             setProofMsg('❌ ' + (e.response?.data?.message || 'Lỗi khi nộp minh chứng'));
-        }
+        } finally { setSubmittingProof(false); }
     };
 
     const submitRefund = async () => {
         if (!refundReason.trim()) { setRefundMsg('❌ Vui lòng nhập lý do hoàn tiền'); return; }
         setSubmittingRefund(true);
         try {
-            await api.post('/student/refunds', {
-                paymentId: refundModal.payment!.id,
-                reason: refundReason,
-                evidenceUrl: refundEvidence,
+            const formData = new FormData();
+            formData.append('paymentId', String(refundModal.payment!.id));
+            formData.append('reason', refundReason);
+            if (refundEvidenceFile) formData.append('evidence', refundEvidenceFile);
+            await api.post('/student/refunds', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
             setRefundMsg('✅ Đã gửi yêu cầu hoàn tiền! Admin sẽ xem xét trong 3-5 ngày làm việc.');
             setRefundReason('');
-            setRefundEvidence('');
+            setRefundEvidenceFile(null);
             fetchAll();
             setTimeout(() => { setRefundModal({ open: false, payment: null }); setRefundMsg(''); }, 2000);
         } catch (e: any) {
@@ -304,7 +312,7 @@ export default function StudentDashboard() {
                                                                 </button>
                                                             )}                                                            {pay.status === 'SUCCESS' && !hasRefund && (
                                                                 <button className="btn-sm btn-danger"
-                                                                    onClick={() => { setRefundModal({ open: true, payment: pay }); setRefundMsg(''); setRefundReason(''); setRefundEvidence(''); }}>
+                                                                    onClick={() => { setRefundModal({ open: true, payment: pay }); setRefundMsg(''); setRefundReason(''); setRefundEvidenceFile(null); }}>
                                                                     🔄 Yêu cầu hoàn tiền
                                                                 </button>
                                                             )}
@@ -393,19 +401,22 @@ export default function StudentDashboard() {
                     <div className="modal-box" onClick={e => e.stopPropagation()}>
                         <h3>📤 Nộp minh chứng chuyển khoản</h3>
                         <p style={{ color: '#64748b', marginBottom: '1rem' }}>
-                            Chuyển khoản xong, nhập URL ảnh minh chứng (hoặc link Google Drive) bên dưới:
+                            Chụp ảnh hoặc chọn ảnh minh chứng chuyển khoản từ thiết bị:
                         </p>
                         <input
-                            type="text"
+                            type="file"
+                            accept="image/*,.pdf"
                             className="modal-input"
-                            placeholder="https://drive.google.com/..."
-                            value={proofUrl}
-                            onChange={e => setProofUrl(e.target.value)}
+                            onChange={e => setProofFile(e.target.files?.[0] || null)}
+                            style={{ padding: '8px' }}
                         />
+                        {proofFile && <p style={{ fontSize: '0.82rem', color: '#10b981', marginTop: '4px' }}>✅ Đã chọn: {proofFile.name}</p>}
                         {proofMsg && <p style={{ marginTop: '8px', color: proofMsg.startsWith('✅') ? '#10b981' : '#ef4444' }}>{proofMsg}</p>}
                         <div className="modal-actions">
-                            <button className="btn-primary" onClick={submitProof}>Xác nhận nộp</button>
-                            <button className="btn-outline" onClick={() => setProofModal({ open: false, paymentId: null })}>Hủy</button>
+                            <button className="btn-primary" onClick={submitProof} disabled={submittingProof}>
+                                {submittingProof ? '⏳ Đang gửi...' : 'Xác nhận nộp'}
+                            </button>
+                            <button className="btn-outline" onClick={() => { setProofModal({ open: false, paymentId: null }); setProofFile(null); setProofMsg(''); }}>Hủy</button>
                         </div>
                     </div>
                 </div>
@@ -426,11 +437,13 @@ export default function StudentDashboard() {
                                 value={refundReason}
                                 onChange={e => setRefundReason(e.target.value)}
                                 placeholder="Ví dụ: Gia sư không dạy đúng cam kết, lớp học bị hủy đột ngột..." />
-                            <label>Minh chứng sự cố (URL ảnh / link Drive)</label>
-                            <input className="modal-input" type="text"
-                                value={refundEvidence}
-                                onChange={e => setRefundEvidence(e.target.value)}
-                                placeholder="https://drive.google.com/... (tùy chọn)" />
+                            <label>Minh chứng sự cố (ảnh từ thiết bị, tùy chọn)</label>
+                            <input type="file" accept="image/*,.pdf"
+                                onChange={e => setRefundEvidenceFile(e.target.files?.[0] || null)}
+                                style={{ padding: '8px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' }} />
+                            {refundEvidenceFile && (
+                                <p style={{ fontSize: '0.82rem', color: '#10b981', marginTop: '4px' }}>✅ Đã chọn: {refundEvidenceFile.name}</p>
+                            )}
                         </div>
                         {refundMsg && (
                             <p style={{ marginTop: '8px', color: refundMsg.startsWith('✅') ? '#10b981' : '#ef4444' }}>
@@ -441,7 +454,7 @@ export default function StudentDashboard() {
                             <button className="btn-primary" onClick={submitRefund} disabled={submittingRefund}>
                                 {submittingRefund ? '⏳ Đang gửi...' : '📤 Gửi yêu cầu'}
                             </button>
-                            <button className="btn-outline" onClick={() => setRefundModal({ open: false, payment: null })}>Hủy</button>
+                            <button className="btn-outline" onClick={() => { setRefundModal({ open: false, payment: null }); setRefundEvidenceFile(null); }}>Hủy</button>
                         </div>
                     </div>
                 </div>

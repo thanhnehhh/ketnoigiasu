@@ -13,6 +13,13 @@ public class TutorProfileController {
 
     private final TutorProfileService tutorProfileService;
 
+    @GetMapping
+    public ResponseEntity<?> getAllTutors(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String subject) {
+        return ResponseEntity.ok(tutorProfileService.getAllTutors(keyword, subject));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<TutorProfileResponse> getTutorProfile(@PathVariable Long id) {
         return ResponseEntity.ok(tutorProfileService.getPublicProfile(id));

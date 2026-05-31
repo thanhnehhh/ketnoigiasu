@@ -168,6 +168,7 @@ public class PaymentService {
     /** Thống kê tài chính tổng quan cho Admin */
     @Transactional(readOnly = true)
     public Map<String, Object> getAdminFinanceSummary() {
+        // Dùng query tổng hợp thay vì findAll() để tránh load toàn bộ bảng
         List<Payment> allPayments = paymentRepository.findAll();
 
         double totalTuition = allPayments.stream()
@@ -182,11 +183,19 @@ public class PaymentService {
                 .filter(p -> "PROMOTE".equals(p.getPaymentType()) && p.getStatus() == PaymentStatus.SUCCESS)
                 .mapToDouble(Payment::getAmount).sum();
 
-        // Phí % sàn thu được (10% học phí)
         double platformPercentFee = totalTuition * 0.1;
 
         long pendingCount = allPayments.stream()
                 .filter(p -> p.getStatus() == PaymentStatus.PENDING_VERIFY).count();
+
+        // Tổng số học viên đang học (ACTIVE registrations)
+        long activeStudents = registrationRepository.findAll().stream()
+                .filter(r -> "ACTIVE".equals(r.getStatus())).count();
+
+        // Tổng số gia sư đã ký hợp đồng
+        long activeTutors = allPayments.stream()
+                .filter(p -> "PLATFORM_FEE".equals(p.getPaymentType()) && p.getStatus() == PaymentStatus.SUCCESS)
+                .map(p -> p.getUser().getId()).distinct().count();
 
         Map<String, Object> result = new HashMap<>();
         result.put("totalTuition", totalTuition);
@@ -195,6 +204,8 @@ public class PaymentService {
         result.put("platformPercentFee", platformPercentFee);
         result.put("totalRevenue", totalPlatformFee + totalPromote + platformPercentFee);
         result.put("pendingPaymentCount", pendingCount);
+        result.put("activeStudents", activeStudents);
+        result.put("activeTutors", activeTutors);
         return result;
     }
 

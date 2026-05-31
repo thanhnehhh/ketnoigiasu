@@ -1,10 +1,19 @@
 import axios from 'axios';
 
+const BASE_URL = 'http://localhost:8080';
+
 const api = axios.create({
-    baseURL: 'http://localhost:8080/api',
+    baseURL: BASE_URL + '/api',
     withCredentials: false,
     headers: { 'Content-Type': 'application/json' },
 });
+
+/** Chuyển URL tương đối từ backend thành URL đầy đủ */
+export function toFullUrl(url: string | null | undefined): string {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return BASE_URL + url;
+}
 
 // Gắn JWT token vào request nếu có
 api.interceptors.request.use((config) => {

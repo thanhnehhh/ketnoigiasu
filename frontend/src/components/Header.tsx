@@ -20,6 +20,7 @@ const Header = () => {
                 <nav className="main-nav">
                     <Link to="/">Trang chủ</Link>
                     <Link to="/courses">Tìm khóa học</Link>
+                    <Link to="/tutors">Gia sư</Link>
                 </nav>
 
                 <div className="auth-buttons">
