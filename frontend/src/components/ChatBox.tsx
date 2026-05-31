@@ -185,10 +185,10 @@ export default function ChatBox({ courseId }: Props) {
                         type="text"
                         value={text}
                         onChange={e => setText(e.target.value)}
-                        placeholder={connected ? (mode === 'EXERCISE' ? 'Nhập đề bài tập...' : 'Nhập tin nhắn...') : '⏳ Đang kết nối...'}
+                        placeholder={mode === 'EXERCISE' ? 'Nhập đề bài tập...' : 'Nhập tin nhắn...'}
                         className="chat-input"
                     />
-                    <button type="submit" className="chat-send-btn" disabled={!connected || !text.trim()}>
+                    <button type="submit" className="chat-send-btn" disabled={!text.trim()}>
                         ➤
                     </button>
                 </form>

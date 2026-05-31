@@ -44,6 +44,9 @@ public class SecurityConfig {
                         // Cho phép tất cả OPTIONS preflight request
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        // WebSocket endpoint — phải permitAll để SockJS handshake thành công
+                        .requestMatchers("/ws/**").permitAll()
+
                         .requestMatchers("/api/auth/**", "/api/otp/**", "/api/public/**").permitAll()
 
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -55,7 +58,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/materials/tutor/upload").hasRole("TUTOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/materials/**").hasRole("TUTOR")
                         .requestMatchers(HttpMethod.GET, "/api/materials/course/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/materials/download/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/materials/download/**").permitAll()
                         .requestMatchers("/api/messages/**").authenticated() // Chat — cả tutor lẫn student
                         .anyRequest().authenticated()
                 )

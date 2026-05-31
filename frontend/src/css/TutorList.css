@@ -1,0 +1,77 @@
+.tutor-list-page { min-height: 100vh; background: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+/* Hero */
+.tl-hero { background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 3rem 1.5rem; text-align: center; color: white; }
+.tl-hero-inner { max-width: 700px; margin: 0 auto; }
+.tl-hero h1 { font-size: 2rem; font-weight: 800; margin: 0 0 0.5rem; }
+.tl-hero p { font-size: 1rem; opacity: 0.85; margin: 0 0 1.5rem; }
+.tl-search-bar { display: flex; gap: 8px; max-width: 600px; margin: 0 auto; }
+.tl-search-bar input {
+    flex: 1; padding: 12px 18px; border: none; border-radius: 10px;
+    font-size: 0.95rem; outline: none;
+}
+.tl-search-bar button {
+    padding: 12px 24px; background: #f59e0b; color: white; border: none;
+    border-radius: 10px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+
+/* Layout */
+.tl-layout { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; display: flex; gap: 2rem; align-items: flex-start; }
+
+/* Sidebar */
+.tl-sidebar { width: 220px; flex-shrink: 0; background: white; border-radius: 16px; padding: 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,0.05); position: sticky; top: 90px; }
+.tl-sidebar h3 { font-size: 1rem; font-weight: 700; color: #1f2937; margin: 0 0 1rem; }
+.tl-filter-block { margin-bottom: 1rem; }
+.tl-filter-block label { display: block; font-size: 0.82rem; font-weight: 600; color: #374151; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.tl-filter-block select { width: 100%; padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.9rem; outline: none; background: white; }
+.tl-filter-block select:focus { border-color: #4f46e5; }
+.tl-apply-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
+.tl-reset-btn { width: 100%; padding: 10px; background: transparent; color: #64748b; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.88rem; cursor: pointer; }
+.tl-reset-btn:hover { background: #f8fafc; }
+
+/* Results */
+.tl-results { flex: 1; min-width: 0; }
+.tl-count { font-size: 0.9rem; color: #64748b; margin-bottom: 1.25rem; }
+.tl-count strong { color: #1f2937; }
+.tl-loading, .tl-empty { text-align: center; padding: 3rem; color: #64748b; background: white; border-radius: 16px; }
+
+/* Grid */
+.tl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem; }
+
+/* Card */
+.tl-card {
+    background: white; border-radius: 16px; padding: 1.25rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;
+    display: flex; flex-direction: column; gap: 10px;
+    transition: all 0.2s;
+}
+.tl-card:hover { box-shadow: 0 6px 20px rgba(79,70,229,0.1); border-color: #c7d2fe; transform: translateY(-2px); }
+
+.tl-card-top { display: flex; gap: 12px; align-items: flex-start; }
+.tl-avatar { width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0; }
+.tl-card-info h3 { font-size: 1rem; font-weight: 700; color: #1f2937; margin: 0 0 4px; }
+.tl-card-info p { font-size: 0.82rem; color: #64748b; margin: 2px 0; }
+
+.tl-subjects { display: flex; flex-wrap: wrap; gap: 6px; }
+.tl-subject-tag {
+    background: #ede9fe; color: #6d28d9; font-size: 0.75rem; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px;
+}
+.tl-subject-tag.more { background: #f1f5f9; color: #64748b; }
+
+.tl-strengths { font-size: 0.85rem; color: #374151; line-height: 1.6; margin: 0; flex: 1; }
+
+.tl-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 10px; border-top: 1px solid #f1f5f9; }
+.tl-verified { font-size: 0.78rem; color: #10b981; font-weight: 600; }
+.tl-btn-view {
+    padding: 7px 16px; background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+    text-decoration: none; transition: opacity 0.2s;
+}
+.tl-btn-view:hover { opacity: 0.9; }
+
+@media (max-width: 768px) {
+    .tl-layout { flex-direction: column; }
+    .tl-sidebar { width: 100%; position: static; }
+    .tl-grid { grid-template-columns: 1fr; }
+}

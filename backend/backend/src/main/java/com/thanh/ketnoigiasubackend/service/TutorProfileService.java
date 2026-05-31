@@ -17,8 +17,35 @@ public class TutorProfileService {
     private final TutorProfileRepository tutorProfileRepository;
     private final CourseRepository courseRepository;
 
-    public TutorProfileResponse getPublicProfile(Long tutorId) {
-        // 1. Tìm thông tin gia sư
+    public List<TutorProfileResponse> getAllTutors(String keyword, String subject) {
+        return tutorProfileRepository.findAll().stream()
+            .filter(t -> t.getUser() != null && t.getUser().isEnabled())
+            .filter(t -> {
+                if (keyword == null || keyword.isEmpty()) return true;
+                String kw = keyword.toLowerCase();
+                return t.getUser().getFullName().toLowerCase().contains(kw)
+                    || (t.getStrengths() != null && t.getStrengths().toLowerCase().contains(kw))
+                    || (t.getSubjects() != null && t.getSubjects().toLowerCase().contains(kw));
+            })
+            .filter(t -> {
+                if (subject == null || subject.isEmpty()) return true;
+                return t.getSubjects() != null && t.getSubjects().contains(subject);
+            })
+            .map(t -> TutorProfileResponse.builder()
+                .id(t.getId())
+                .fullName(t.getUser().getFullName())
+                .email(t.getUser().getEmail())
+                .phone(t.getUser().getPhone())
+                .school(t.getSchool())
+                .major(t.getMajor())
+                .strengths(t.getStrengths())
+                .address(t.getAddress())
+                .courses(java.util.List.of())
+                .build())
+            .toList();
+    }
+
+    public TutorProfileResponse getPublicProfile(Long tutorId) {        // 1. Tìm thông tin gia sư
         TutorProfile tutor = tutorProfileRepository.findById(tutorId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin gia sư!"));
 

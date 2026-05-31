@@ -14,13 +14,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void configureMessageBroker(MessageBrokerRegistry config) {
         config.enableSimpleBroker("/topic");
         config.setApplicationDestinationPrefixes("/app");
+        // Heartbeat: server gửi ping mỗi 10s, client phải pong trong 10s
+        config.enableSimpleBroker("/topic").setHeartbeatValue(new long[]{10000, 10000});
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Endpoint kết nối WebSocket, fallback SockJS cho browser cũ
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("http://localhost:5173")
-                .withSockJS();
+                .setAllowedOriginPatterns("*")  // Cho phép tất cả origin trong dev
+                .withSockJS()
+                .setHeartbeatTime(25000);        // SockJS heartbeat 25s
     }
 }

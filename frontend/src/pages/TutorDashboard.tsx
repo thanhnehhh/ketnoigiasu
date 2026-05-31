@@ -90,8 +90,9 @@ export default function TutorDashboard() {
 
     // Modal phí sàn
     const [feeModal, setFeeModal] = useState(false);
-    const [feeProof, setFeeProof] = useState('');
+    const [feeProofFile, setFeeProofFile] = useState<File | null>(null);
     const [feeMsg, setFeeMsg] = useState('');
+    const [submittingFee, setSubmittingFee] = useState(false);
 
     useEffect(() => { fetchAll(); }, []);
 
@@ -171,16 +172,20 @@ export default function TutorDashboard() {
     };
 
     const submitFee = async () => {
-        if (!feeProof.trim()) { setFeeMsg('Vui lòng nhập URL minh chứng'); return; }
+        if (!feeProofFile) { setFeeMsg('Vui lòng chọn ảnh minh chứng'); return; }
+        setSubmittingFee(true);
         try {
-            await api.post('/payments/platform-fee', JSON.stringify(feeProof), {
-                headers: { 'Content-Type': 'application/json' }
+            const formData = new FormData();
+            formData.append('proof', feeProofFile);
+            await api.post('/payments/platform-fee', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
             setFeeMsg('✅ Đã gửi yêu cầu! Chờ Admin duyệt.');
+            setFeeProofFile(null);
             fetchAll();
         } catch (e: any) {
             setFeeMsg('❌ ' + (e.response?.data?.message || 'Lỗi'));
-        }
+        } finally { setSubmittingFee(false); }
     };
 
     const submitReply = async () => {
@@ -476,13 +481,18 @@ export default function TutorDashboard() {
                     <div className="modal-box" onClick={e => e.stopPropagation()}>
                         <h3>💵 Nộp phí sàn</h3>
                         <p style={{ color: '#64748b', marginBottom: '1rem' }}>
-                            Chuyển khoản <strong>200.000đ</strong> theo thông tin hợp đồng, sau đó nhập URL ảnh minh chứng:
+                            Chuyển khoản <strong>200.000đ</strong> theo thông tin hợp đồng, sau đó chọn ảnh minh chứng:
                         </p>
-                        <input className="modal-input" placeholder="https://..." value={feeProof} onChange={e => setFeeProof(e.target.value)} />
+                        <input type="file" accept="image/*,.pdf"
+                            onChange={e => setFeeProofFile(e.target.files?.[0] || null)}
+                            style={{ padding: '8px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' }} />
+                        {feeProofFile && <p style={{ fontSize: '0.82rem', color: '#10b981', marginTop: '4px' }}>✅ Đã chọn: {feeProofFile.name}</p>}
                         {feeMsg && <p style={{ color: feeMsg.startsWith('✅') ? '#10b981' : '#ef4444', marginTop: '8px' }}>{feeMsg}</p>}
                         <div className="modal-actions">
-                            <button className="btn-primary" onClick={submitFee}>Gửi yêu cầu</button>
-                            <button className="btn-outline" onClick={() => setFeeModal(false)}>Hủy</button>
+                            <button className="btn-primary" onClick={submitFee} disabled={submittingFee}>
+                                {submittingFee ? '⏳ Đang gửi...' : 'Gửi yêu cầu'}
+                            </button>
+                            <button className="btn-outline" onClick={() => { setFeeModal(false); setFeeProofFile(null); setFeeMsg(''); }}>Hủy</button>
                         </div>
                     </div>
                 </div>

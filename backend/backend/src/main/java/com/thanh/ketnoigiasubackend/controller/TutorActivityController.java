@@ -40,17 +40,19 @@ public class TutorActivityController {
         return ResponseEntity.ok(sessionService.getSessionsByCourse(courseId));
     }
 
-    // 4. Đăng thông báo khẩn cho cả lớp (Ví dụ báo nghỉ học)
+    // 4. Đăng thông báo cho học viên (lớp 1-1 nên chỉ có 1 học viên)
     @PostMapping("/announcement")
     public ResponseEntity<?> postAnnouncement(@RequestParam Long courseId, @RequestBody String content) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Khóa học không tồn tại"));
 
         if (course.getRegistrations() != null) {
-            course.getRegistrations().forEach(reg ->
+            course.getRegistrations().stream()
+                .filter(reg -> "ACTIVE".equals(reg.getStatus()))
+                .forEach(reg ->
                     notificationService.createNotification(reg.getStudent().getUser(), content));
         }
-        return ResponseEntity.ok("Đã gửi thông báo cho cả lớp.");
+        return ResponseEntity.ok("Đã gửi thông báo cho học viên.");
     }
 
     @PutMapping("/session/{id}/edit-log")

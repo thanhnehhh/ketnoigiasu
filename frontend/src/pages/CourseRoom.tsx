@@ -183,7 +183,7 @@ export default function CourseRoom() {
                 params: { courseId },
                 headers: { 'Content-Type': 'text/plain' }
             });
-            flash('✅ Đã gửi thông báo cho cả lớp!');
+            flash('✅ Đã gửi thông báo cho học viên!');
             setAnnouncement('');
         } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
     };
@@ -341,7 +341,7 @@ export default function CourseRoom() {
                                     type="text"
                                     value={announcement}
                                     onChange={e => setAnnouncement(e.target.value)}
-                                    placeholder="📢 Gửi thông báo khẩn cho cả lớp..."
+                                    placeholder="📢 Gửi thông báo cho học viên..."
                                     onKeyDown={e => e.key === 'Enter' && sendAnnouncement()}
                                     className="cr-announcement-input"
                                 />

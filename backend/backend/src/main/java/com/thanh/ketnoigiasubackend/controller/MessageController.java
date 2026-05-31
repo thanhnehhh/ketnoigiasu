@@ -28,6 +28,19 @@ public class MessageController {
         return ResponseEntity.ok(messageService.getMessages(courseId));
     }
 
+    // REST fallback khi WebSocket mất kết nối
+    @PostMapping("/api/messages/course/{courseId}/text")
+    public ResponseEntity<MessageResponse> sendTextRest(
+            @PathVariable Long courseId,
+            @RequestBody Map<String, String> payload,
+            Authentication auth) {
+        String content = payload.get("content");
+        String type = payload.getOrDefault("type", "TEXT");
+        MessageResponse saved = messageService.sendText(courseId, auth.getName(), content, type);
+        messagingTemplate.convertAndSend("/topic/chat/" + courseId, saved);
+        return ResponseEntity.ok(saved);
+    }
+
     @MessageMapping("/chat/{courseId}")
     public void sendMessage(
             @DestinationVariable Long courseId,
