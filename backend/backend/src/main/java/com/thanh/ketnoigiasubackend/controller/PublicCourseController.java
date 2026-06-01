@@ -20,7 +20,10 @@ public class PublicCourseController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String subject,
             @RequestParam(required = false) Double minPrice,
-            @RequestParam(required = false) Double maxPrice) {
-        return ResponseEntity.ok(courseService.searchCourses(q, subject, minPrice, maxPrice));
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) String grade,
+            @RequestParam(required = false) String teachingMode,
+            @RequestParam(required = false) String province) {
+        return ResponseEntity.ok(courseService.searchCourses(q, subject, minPrice, maxPrice, grade, teachingMode, province));
     }
 }

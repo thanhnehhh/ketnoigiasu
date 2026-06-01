@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { VIETNAM_PROVINCES, getDistricts } from '../data/vietnamDistricts';
 import '../css/CourseList.css';
 
 interface Course {
@@ -20,6 +21,7 @@ interface Course {
     avgRating: number;
     registrationCount: number;
     score: number;
+    teachingMode: string;
 }
 
 interface Subject {
@@ -35,12 +37,15 @@ export default function CourseList() {
     const [loading, setLoading] = useState(false);
     const [keyword, setKeyword] = useState('');
     const [subject, setSubject] = useState(searchParams.get('subject') || '');
-    const [minPrice, setMinPrice] = useState('');
-    const [maxPrice, setMaxPrice] = useState('');
+    const [minPrice, setMinPrice] = useState(0);
+    const [maxPrice, setMaxPrice] = useState(500000);
+    const [grade, setGrade] = useState('');
+    const [teachingMode, setTeachingMode] = useState('');
+    const [province, setProvince] = useState('');
+    const [district, setDistrict] = useState('');
     const [registerMsg, setRegisterMsg] = useState<Record<number, string>>({});
 
     useEffect(() => {
-        // Load subjects từ BE để dùng đúng tên
         api.get('/public/subjects').then(res => setSubjects(res.data)).catch(console.error);
         search();
     }, []);
@@ -51,8 +56,13 @@ export default function CourseList() {
             const params: any = {};
             if (keyword) params.q = keyword;
             if (subject) params.subject = subject;
-            if (minPrice) params.minPrice = minPrice;
-            if (maxPrice) params.maxPrice = maxPrice;
+            if (minPrice > 0) params.minPrice = minPrice;
+            if (maxPrice < 500000) params.maxPrice = maxPrice;
+            if (grade) params.grade = grade;
+            if (teachingMode) params.teachingMode = teachingMode;
+            // Ưu tiên quận/huyện nếu có, không thì dùng tỉnh
+            if (district) params.province = district;
+            else if (province) params.province = province;
             const res = await api.get('/public/courses', { params });
             setCourses(res.data);
         } catch (e) { console.error(e); }
@@ -115,15 +125,72 @@ export default function CourseList() {
                         </select>
                     </div>
                     <div className="filter-block">
-                        <label>Giá từ (VNĐ)</label>
-                        <input type="number" placeholder="0" value={minPrice} onChange={e => setMinPrice(e.target.value)} />
+                        <label>Hình thức dạy</label>
+                        <select value={teachingMode} onChange={e => setTeachingMode(e.target.value)}>
+                            <option value="">Tất cả hình thức</option>
+                            <option value="ONLINE">🌐 Online</option>
+                            <option value="OFFLINE">🏠 Offline (Tại nhà)</option>
+                        </select>
                     </div>
                     <div className="filter-block">
-                        <label>Giá đến (VNĐ)</label>
-                        <input type="number" placeholder="1000000" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} />
+                        <label>Tỉnh / Thành phố</label>
+                        <select value={province} onChange={e => { setProvince(e.target.value); setDistrict(''); }}>
+                            <option value="">Tất cả địa điểm</option>
+                            {VIETNAM_PROVINCES.map(p => (
+                                <option key={p.name} value={p.name}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    {province && (
+                        <div className="filter-block">
+                            <label>Quận / Huyện</label>
+                            <select value={district} onChange={e => setDistrict(e.target.value)}>
+                                <option value="">Tất cả quận/huyện</option>
+                                {getDistricts(province).map(d => (
+                                    <option key={d} value={d}>{d}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    <div className="filter-block">
+                        <label>Giá / buổi (VNĐ)</label>
+                        <div className="price-range-display">
+                            <span>{minPrice.toLocaleString('vi-VN')}đ</span>
+                            <span>—</span>
+                            <span>{maxPrice >= 500000 ? '500.000đ+' : maxPrice.toLocaleString('vi-VN') + 'đ'}</span>
+                        </div>
+                        <div className="price-slider-wrap">
+                            <input
+                                type="range"
+                                className="price-slider"
+                                min={0} max={500000} step={10000}
+                                value={minPrice}
+                                onChange={e => {
+                                    const v = Number(e.target.value);
+                                    if (v <= maxPrice) setMinPrice(v);
+                                }}
+                            />
+                            <input
+                                type="range"
+                                className="price-slider"
+                                min={0} max={500000} step={10000}
+                                value={maxPrice}
+                                onChange={e => {
+                                    const v = Number(e.target.value);
+                                    if (v >= minPrice) setMaxPrice(v);
+                                }}
+                            />
+                        </div>
+                        <div className="price-marks">
+                            <span>0</span>
+                            <span>100k</span>
+                            <span>200k</span>
+                            <span>300k</span>
+                            <span>500k+</span>
+                        </div>
                     </div>
                     <button className="filter-apply-btn" onClick={search}>Áp dụng bộ lọc</button>
-                    <button className="filter-reset-btn" onClick={() => { setKeyword(''); setSubject(''); setMinPrice(''); setMaxPrice(''); setTimeout(search, 0); }}>
+                    <button className="filter-reset-btn" onClick={() => { setKeyword(''); setSubject(''); setMinPrice(0); setMaxPrice(500000); setGrade(''); setTeachingMode(''); setProvince(''); setDistrict(''); setTimeout(search, 0); }}>
                         Xóa bộ lọc
                     </button>
                 </aside>
@@ -160,6 +227,8 @@ export default function CourseList() {
                                             <span>👥 {c.registrationCount} học viên</span>
                                             <span className="meta-sep">·</span>
                                             <span>📅 {c.totalSessions} buổi</span>
+                                            <span className="meta-sep">·</span>
+                                            <span>{c.teachingMode === 'ONLINE' ? '🌐 Online' : c.teachingMode === 'OFFLINE' ? '🏠 Offline' : '🌐🏠 Online & Offline'}</span>
                                         </div>
                                         {c.description && (
                                             <p className="course-desc">{c.description.slice(0, 100)}{c.description.length > 100 ? '...' : ''}</p>

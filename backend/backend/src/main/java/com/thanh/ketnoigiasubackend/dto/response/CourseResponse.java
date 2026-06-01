@@ -26,5 +26,6 @@ public class CourseResponse {
     // Ranking fields
     private Double avgRating;
     private Integer registrationCount;
-    private Double score;          // điểm tổng hợp để sort
+    private Double score;
+    private String teachingMode; // ONLINE | OFFLINE | BOTH
 }
