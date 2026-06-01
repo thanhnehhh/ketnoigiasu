@@ -56,6 +56,7 @@ public class CourseService {
                 .subject(subject)
                 .status(CourseStatus.PENDING_APPROVE)
                 .isPromoted(false)
+                .teachingMode(request.getTeachingMode() != null ? request.getTeachingMode() : "BOTH")
                 .build();
 
         Course savedCourse = courseRepository.save(course);
@@ -72,8 +73,7 @@ public class CourseService {
                 .stream().map(this::mapToResponse).toList();
     }
 
-    public List<CourseResponse> searchCourses(String keyword, String subject, Double minPrice, Double maxPrice) {
-        // Bắt đầu với filter APPROVED — không dùng where(null) để tránh NPE
+    public List<CourseResponse> searchCourses(String keyword, String subject, Double minPrice, Double maxPrice, String grade, String teachingMode, String province) {
         Specification<Course> spec = (root, query, cb) -> cb.equal(root.get("status"), CourseStatus.APPROVED);
 
         if (keyword != null && !keyword.isEmpty())
@@ -84,6 +84,19 @@ public class CourseService {
             spec = spec.and((root, query, cb) -> cb.ge(root.get("pricePerSession"), minPrice));
         if (maxPrice != null)
             spec = spec.and((root, query, cb) -> cb.le(root.get("pricePerSession"), maxPrice));
+        if (grade != null && !grade.isEmpty())
+            spec = spec.and((root, query, cb) -> cb.like(root.get("tutor").get("grades"), "%" + grade + "%"));
+        if (teachingMode != null && !teachingMode.isEmpty() && !teachingMode.equals("ALL"))
+            spec = spec.and((root, query, cb) -> cb.or(
+                cb.equal(root.get("teachingMode"), teachingMode),
+                cb.equal(root.get("teachingMode"), "BOTH")
+            ));
+
+        // Lọc theo tỉnh thành — tìm trong địa chỉ gia sư
+        // province param truyền vào là tên tỉnh, ví dụ "Hà Nội", "TP. Hồ Chí Minh"
+        if (province != null && !province.isEmpty())
+            spec = spec.and((root, query, cb) ->
+                cb.like(cb.lower(root.get("tutor").get("address")), "%" + province.toLowerCase() + "%"));
 
         List<CourseResponse> results = courseRepository.findAll(spec)
                 .stream().map(this::mapToResponse).toList();
@@ -137,6 +150,7 @@ public class CourseService {
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy môn học"));
             course.setSubject(subject);
         }
+        if (request.getTeachingMode() != null) course.setTeachingMode(request.getTeachingMode());
         course.setStatus(CourseStatus.PENDING_APPROVE);
         return mapToResponse(courseRepository.save(course));
     }
@@ -190,6 +204,7 @@ public class CourseService {
                 .avgRating(avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0)
                 .registrationCount((int) totalRegistrations)
                 .score(Math.round(score * 10.0) / 10.0)
+                .teachingMode(course.getTeachingMode() != null ? course.getTeachingMode() : "BOTH")
                 .build();
     }
 }

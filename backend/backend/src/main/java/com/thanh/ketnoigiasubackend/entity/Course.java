@@ -62,4 +62,8 @@ public class Course {
 
     private boolean isPromoted = false;
     private LocalDateTime promotionExpiration;
+
+    // Hình thức dạy: ONLINE | OFFLINE | BOTH
+    @Builder.Default
+    private String teachingMode = "BOTH";
 }

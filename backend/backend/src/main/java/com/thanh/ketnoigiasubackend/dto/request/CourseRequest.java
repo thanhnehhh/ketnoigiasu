@@ -10,4 +10,5 @@ public class CourseRequest {
     private Double pricePerSession;
     private Integer totalSessions;
     private Long subjectId;
+    private String teachingMode; // ONLINE | OFFLINE | BOTH
 }

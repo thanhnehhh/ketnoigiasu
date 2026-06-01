@@ -166,13 +166,6 @@ export default function ChatBox({ courseId }: Props) {
                         onClick={() => setMode('TEXT')}>
                         💬 Tin nhắn
                     </button>
-                    {user?.role === 'TUTOR' && (
-                        <button
-                            className={`chat-mode-btn ${mode === 'EXERCISE' ? 'active' : ''}`}
-                            onClick={() => setMode('EXERCISE')}>
-                            📝 Bài tập
-                        </button>
-                    )}
                     <button
                         className="chat-mode-btn"
                         onClick={() => setShowFileForm(f => !f)}>

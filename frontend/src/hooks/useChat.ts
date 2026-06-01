@@ -21,10 +21,14 @@ export function useChat(courseId: string | undefined) {
     const [connected, setConnected] = useState(false);
     const clientRef = useRef<Client | null>(null);
 
-    // Load lịch sử tin nhắn khi vào lớp
+    // Chỗ sửa 1: Thêm token khi load lịch sử lúc vào lớp
     useEffect(() => {
         if (!courseId) return;
-        api.get(`/messages/course/${courseId}`)
+        const token = localStorage.getItem('token');
+
+        api.get(`/messages/course/${courseId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
             .then(res => setMessages(res.data))
             .catch(console.error);
     }, [courseId]);
@@ -45,11 +49,18 @@ export function useChat(courseId: string | undefined) {
             heartbeatOutgoing: 10000,
             onConnect: () => {
                 setConnected(true);
+
+                // Chỗ sửa 2: Thêm token khi kết nối WebSocket thành công
+                api.get(`/messages/course/${courseId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                    .then(res => setMessages(res.data))
+                    .catch(console.error);
+
                 // Subscribe nhận tin nhắn của lớp này
                 client.subscribe(`/topic/chat/${courseId}`, (frame) => {
                     const msg: ChatMessage = JSON.parse(frame.body);
                     setMessages(prev => {
-                        // Tránh duplicate nếu chính mình gửi
                         if (prev.some(m => m.id === msg.id)) return prev;
                         return [...prev, msg];
                     });
@@ -72,21 +83,16 @@ export function useChat(courseId: string | undefined) {
     }, [courseId]);
 
     // Gửi tin nhắn text hoặc bài tập
-    // Nếu WebSocket đã kết nối → gửi real-time
-    // Nếu chưa kết nối → gửi qua REST (lưu DB, người kia nhận khi reload)
     const sendText = useCallback(async (content: string, type: 'TEXT' | 'EXERCISE' = 'TEXT') => {
         if (!courseId) return;
         if (clientRef.current?.connected) {
-            // Real-time qua WebSocket
             clientRef.current.publish({
                 destination: `/app/chat/${courseId}`,
                 body: JSON.stringify({ content, type }),
             });
         } else {
-            // Fallback: gửi qua REST
             try {
                 const res = await api.post(`/messages/course/${courseId}/text`, { content, type });
-                // Thêm vào local state để hiển thị ngay
                 setMessages(prev => {
                     if (prev.some(m => m.id === res.data.id)) return prev;
                     return [...prev, res.data];
@@ -97,7 +103,7 @@ export function useChat(courseId: string | undefined) {
         }
     }, [courseId]);
 
-    // Gửi file qua REST (multipart không qua WebSocket)
+    // Gửi file qua REST
     const sendFile = useCallback(async (title: string, file: File) => {
         if (!courseId) return;
         const formData = new FormData();
@@ -106,7 +112,6 @@ export function useChat(courseId: string | undefined) {
         await api.post(`/messages/course/${courseId}/file`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
         });
-        // BE sẽ broadcast qua WebSocket, FE nhận qua subscription
     }, [courseId]);
 
     return { messages, connected, sendText, sendFile };

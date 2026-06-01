@@ -12,14 +12,19 @@ const FEATURES = [
 ];
 
 const SUBJECTS = [
-    { name: 'Toán học',   icon: '📐', color: '#ede9fe', textColor: '#6d28d9' },
-    { name: 'Tiếng Anh',  icon: '🇬🇧', color: '#dbeafe', textColor: '#1d4ed8' },
-    { name: 'Vật lý',     icon: '⚡',  color: '#fef3c7', textColor: '#92400e' },
-    { name: 'Hóa học',    icon: '🧪',  color: '#d1fae5', textColor: '#065f46' },
-    { name: 'Ngữ văn',    icon: '📖',  color: '#fee2e2', textColor: '#991b1b' },
-    { name: 'IELTS',      icon: '🌍',  color: '#e0f2fe', textColor: '#0369a1' },
-    { name: 'Lịch sử',    icon: '🏛️',  color: '#fce7f3', textColor: '#9d174d' },
-    { name: 'Tin học',    icon: '💻',  color: '#f3f4f6', textColor: '#374151' },
+    { name: 'Toán',        icon: '📐', color: '#ede9fe', textColor: '#6d28d9' },
+    { name: 'Tiếng Anh',   icon: '🇬🇧', color: '#dbeafe', textColor: '#1d4ed8' },
+    { name: 'Lý',          icon: '⚡',  color: '#fef3c7', textColor: '#92400e' },
+    { name: 'Hóa',         icon: '🧪',  color: '#d1fae5', textColor: '#065f46' },
+    { name: 'Văn',         icon: '📖',  color: '#fee2e2', textColor: '#991b1b' },
+    { name: 'IELTS',       icon: '🌍',  color: '#e0f2fe', textColor: '#0369a1' },
+    { name: 'TOEIC',       icon: '📝',  color: '#fef9c3', textColor: '#854d0e' },
+    { name: 'Tiếng Trung', icon: '🇨🇳', color: '#fce7f3', textColor: '#9d174d' },
+    { name: 'Tiếng Nhật',  icon: '🇯🇵', color: '#fff7ed', textColor: '#9a3412' },
+    { name: 'Lịch sử',     icon: '🏛️',  color: '#f3e8ff', textColor: '#7e22ce' },
+    { name: 'Địa lý',      icon: '🗺️',  color: '#ecfdf5', textColor: '#065f46' },
+    { name: 'Sinh học',    icon: '🌿',  color: '#f0fdf4', textColor: '#166534' },
+    { name: 'Tin học',     icon: '💻',  color: '#f3f4f6', textColor: '#374151' },
 ];
 
 const TUTORS = [
@@ -135,7 +140,7 @@ export default function Home() {
             <section className="subjects-section">
                 <div className="section-inner">
                     <h2 className="section-title">Khám phá theo môn học</h2>
-                    <p className="section-sub">Hơn 20 môn học với gia sư chuyên sâu</p>
+                    <p className="section-sub">13 môn học với gia sư chuyên sâu, đã được xác minh</p>
                     <div className="subjects-grid">
                         {SUBJECTS.map(s => (
                             <Link key={s.name} to={`/courses?subject=${encodeURIComponent(s.name)}`}

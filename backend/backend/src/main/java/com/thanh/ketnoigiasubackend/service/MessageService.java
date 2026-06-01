@@ -20,6 +20,7 @@ public class MessageService {
     private final FileStorageService fileStorageService;
 
     /** Lấy toàn bộ tin nhắn của lớp học */
+    @Transactional(readOnly = true)
     public List<MessageResponse> getMessages(Long courseId) {
         return messageRepository.findByCourseIdOrderByCreatedAtAsc(courseId)
                 .stream().map(this::toResponse).toList();

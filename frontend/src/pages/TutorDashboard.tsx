@@ -85,8 +85,9 @@ export default function TutorDashboard() {
 
     // Modal tạo/sửa khóa học
     const [courseModal, setCourseModal] = useState<{ open: boolean; editing: Course | null }>({ open: false, editing: null });
-    const [courseForm, setCourseForm] = useState({ title: '', description: '', pricePerSession: '', totalSessions: '', subjectId: '1' });
+    const [courseForm, setCourseForm] = useState({ title: '', description: '', pricePerSession: '', totalSessions: '', subjectId: '1', teachingMode: 'BOTH' });
     const [courseMsg, setCourseMsg] = useState('');
+    const [subjects, setSubjects] = useState<{ id: number; name: string }[]>([]);
 
     // Modal phí sàn
     const [feeModal, setFeeModal] = useState(false);
@@ -94,7 +95,10 @@ export default function TutorDashboard() {
     const [feeMsg, setFeeMsg] = useState('');
     const [submittingFee, setSubmittingFee] = useState(false);
 
-    useEffect(() => { fetchAll(); }, []);
+    useEffect(() => {
+        fetchAll();
+        api.get('/public/subjects').then(res => setSubjects(res.data)).catch(console.error);
+    }, []);
 
     const fetchAll = async () => {
         setLoading(true);
@@ -124,6 +128,7 @@ export default function TutorDashboard() {
                 pricePerSession: parseFloat(courseForm.pricePerSession),
                 totalSessions: parseInt(courseForm.totalSessions),
                 subjectId: parseInt(courseForm.subjectId),
+                teachingMode: courseForm.teachingMode,
             };
             if (courseModal.editing) {
                 await api.put(`/courses/${courseModal.editing.id}`, payload);
@@ -145,6 +150,7 @@ export default function TutorDashboard() {
             pricePerSession: String(course.pricePerSession),
             totalSessions: String(course.totalSessions),
             subjectId: '1',
+            teachingMode: 'BOTH',
         });
         setCourseModal({ open: true, editing: course });
         setCourseMsg('');
@@ -268,7 +274,7 @@ export default function TutorDashboard() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                         <h2 className="dash-title" style={{ margin: 0 }}>Khóa học của tôi</h2>
                                         <button className="btn-primary" onClick={() => {
-                                            setCourseForm({ title: '', description: '', pricePerSession: '', totalSessions: '', subjectId: '1' });
+                                            setCourseForm({ title: '', description: '', pricePerSession: '', totalSessions: '', subjectId: subjects.length > 0 ? String(subjects[0].id) : '1', teachingMode: 'BOTH' });
                                             setCourseModal({ open: true, editing: null });
                                             setCourseMsg('');
                                         }}>+ Tạo khóa học</button>
@@ -461,8 +467,16 @@ export default function TutorDashboard() {
                                     <input className="modal-input" type="number" value={courseForm.totalSessions} onChange={e => setCourseForm(p => ({ ...p, totalSessions: e.target.value }))} placeholder="10" />
                                 </div>
                             </div>
-                            <label>Môn học (ID) *</label>
-                            <input className="modal-input" type="number" value={courseForm.subjectId} onChange={e => setCourseForm(p => ({ ...p, subjectId: e.target.value }))} placeholder="1" />
+                            <label>Môn học *</label>
+                            <select className="modal-input" value={courseForm.subjectId} onChange={e => setCourseForm(p => ({ ...p, subjectId: e.target.value }))}>
+                                {subjects.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                            </select>
+                            <label>Hình thức dạy *</label>
+                            <select className="modal-input" value={courseForm.teachingMode} onChange={e => setCourseForm(p => ({ ...p, teachingMode: e.target.value }))}>
+                                <option value="BOTH">🌐🏠 Cả hai (Online & Offline)</option>
+                                <option value="ONLINE">🌐 Online</option>
+                                <option value="OFFLINE">🏠 Offline (Tại nhà)</option>
+                            </select>
                         </div>
                         {courseMsg && <p style={{ color: courseMsg.startsWith('✅') ? '#10b981' : '#ef4444', marginTop: '8px' }}>{courseMsg}</p>}
                         <div className="modal-actions">
