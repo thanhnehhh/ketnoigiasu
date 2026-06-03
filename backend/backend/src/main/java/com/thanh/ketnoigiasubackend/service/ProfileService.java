@@ -14,6 +14,8 @@ import com.thanh.ketnoigiasubackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +24,7 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final TutorProfileRepository tutorProfileRepository;
+    private final FileStorageService fileStorageService;
 
     public Object getProfileByEmail(String email) {
         User user = userRepository.findByEmail(email)
@@ -51,13 +54,17 @@ public class ProfileService {
                 .address(tutor.getAddress())
                 .school(tutor.getSchool())
                 .major(tutor.getMajor())
+                .graduationYear(tutor.getGraduationYear())
+                .currentOccupation(tutor.getCurrentOccupation())
                 .strengths(tutor.getStrengths())
-                // CHỖ NÀY CẦN FIX: Chuyển String thành List
                 .subjects(tutor.getSubjects() != null ?
                         java.util.Arrays.asList(tutor.getSubjects().split("\\s*,\\s*")) : null)
                 .grades(tutor.getGrades() != null ?
                         java.util.Arrays.asList(tutor.getGrades().split("\\s*,\\s*")) : null)
                 .avatar(user.getAvatar())
+                .bio(tutor.getBio())
+                .avatarUrl(tutor.getAvatarUrl())
+                .teachingMode(tutor.getTeachingMode())
                 .build();
     }
 
@@ -121,9 +128,22 @@ public class ProfileService {
         if (request.getStrengths() != null) profile.setStrengths(request.getStrengths());
         if (request.getSubjects() != null) profile.setSubjects(request.getSubjects());
         if (request.getGrades() != null) profile.setGrades(request.getGrades());
+        if (request.getBio() != null) profile.setBio(request.getBio());
 
         tutorProfileRepository.save(profile);
 
         return mapToTutorResponse(user, profile);
+    }
+
+    @Transactional
+    public Map<String, String> uploadTutorAvatar(String email, MultipartFile file) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        TutorProfile profile = tutorProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Profile not found"));
+        String savedName = fileStorageService.save(file);
+        profile.setAvatarUrl(savedName);
+        tutorProfileRepository.save(profile);
+        return Map.of("avatarUrl", savedName);
     }
 }

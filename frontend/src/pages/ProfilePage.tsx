@@ -29,6 +29,11 @@ export default function ProfilePage() {
     const [newPw, setNewPw] = useState('');
     const [confirmPw, setConfirmPw] = useState('');
 
+    // Avatar upload (tutor)
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarMsg, setAvatarMsg] = useState('');
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
     useEffect(() => { fetchProfile(); }, []);
 
     const fetchProfile = async () => {
@@ -73,6 +78,7 @@ export default function ProfilePage() {
                     strengths: profile.strengths,
                     subjects: profile.subjects,
                     grades: profile.grades,
+                    bio: profile.bio,
                 });
             }
             flash('✅ Cập nhật hồ sơ thành công!');
@@ -104,6 +110,21 @@ export default function ProfilePage() {
     };
 
     const set = (field: string, val: string) => setProfile((p: any) => ({ ...p, [field]: val }));
+
+    const handleUploadAvatar = async () => {
+        if (!avatarFile) return;
+        setUploadingAvatar(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', avatarFile);
+            await api.post('/profile/tutor/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+            setAvatarMsg('✅ Cập nhật ảnh thành công!');
+            setAvatarFile(null);
+            fetchProfile();
+        } catch (e: any) {
+            setAvatarMsg('❌ ' + (e.response?.data?.message || 'Lỗi upload'));
+        } finally { setUploadingAvatar(false); }
+    };
 
     return (
         <div className="dashboard-page">
@@ -208,12 +229,41 @@ export default function ProfilePage() {
                                                     <label>Kinh nghiệm & Ưu điểm</label>
                                                     <textarea rows={3} value={profile.strengths || ''} onChange={e => set('strengths', e.target.value)} />
                                                 </div>
+                                                <div className="form-group full-width">
+                                                    <label>👋 Giới thiệu bản thân <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 400 }}>(hiển thị công khai cho học viên)</span></label>
+                                                    <textarea rows={5} value={profile.bio || ''} onChange={e => set('bio', e.target.value)}
+                                                        placeholder="Ví dụ: Xin chào! Tôi là gia sư Toán với 5 năm kinh nghiệm, từng dạy nhiều học sinh đạt điểm cao trong kỳ thi THPT. Phương pháp của tôi tập trung vào hiểu bản chất thay vì học thuộc lòng..." />
+                                                </div>
                                             </>
                                         )}
                                     </div>
                                     <button type="submit" className="btn-primary" disabled={saving} style={{ marginTop: '1rem' }}>
                                         {saving ? 'Đang lưu...' : '💾 Lưu thay đổi'}
                                     </button>
+
+                                    {user?.role === 'TUTOR' && (
+                                        <div style={{ marginTop: '2rem', padding: '1.25rem', background: '#f8fafc', borderRadius: '12px', border: '1.5px solid #e2e8f0' }}>
+                                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1f2937', marginBottom: '0.75rem' }}>📸 Ảnh đại diện</h3>
+                                            {profile.avatarUrl && (
+                                                <img
+                                                    src={`http://localhost:8080/api/materials/download/${profile.avatarUrl}`}
+                                                    alt="avatar"
+                                                    style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', marginBottom: '0.75rem', border: '3px solid #4f46e5' }}
+                                                />
+                                            )}
+                                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                <input type="file" accept="image/*"
+                                                    onChange={e => setAvatarFile(e.target.files?.[0] || null)}
+                                                    style={{ fontSize: '0.88rem' }} />
+                                                <button type="button" className="btn-primary" onClick={handleUploadAvatar}
+                                                    disabled={!avatarFile || uploadingAvatar}
+                                                    style={{ padding: '8px 16px', fontSize: '0.88rem' }}>
+                                                    {uploadingAvatar ? 'Đang upload...' : '📤 Cập nhật ảnh'}
+                                                </button>
+                                            </div>
+                                            {avatarMsg && <p style={{ fontSize: '0.82rem', marginTop: '6px', color: avatarMsg.startsWith('✅') ? '#10b981' : '#ef4444' }}>{avatarMsg}</p>}
+                                        </div>
+                                    )}
                                 </form>
                             )}
 

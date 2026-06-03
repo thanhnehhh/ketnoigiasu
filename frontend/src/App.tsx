@@ -20,6 +20,7 @@ import TutorProfileDetail from './pages/TutorProfileDetail';
 import CourseDetail       from './pages/CourseDetail';
 import TutorPaymentPage   from './pages/TutorPaymentPage';
 import TutorList          from './pages/TutorList';
+import VNPayReturn        from './pages/VNPayReturn';
 
 // Guard: chỉ cho vào nếu đã đăng nhập đúng role
 function RoleGuard({ role, children }: { role: string | string[]; children: ReactNode }) {
@@ -84,6 +85,9 @@ function AppRoutes() {
 
             {/* ===== PUBLIC — TUTOR PROFILE ===== */}
             <Route path="/tutor-profile/:id" element={<TutorProfileDetail />} />
+
+            {/* ===== VNPAY RETURN ===== */}
+            <Route path="/payment/vnpay/return" element={<VNPayReturn />} />
 
             {/* ===== PROTECTED — ADMIN ===== */}
             <Route path="/admin" element={

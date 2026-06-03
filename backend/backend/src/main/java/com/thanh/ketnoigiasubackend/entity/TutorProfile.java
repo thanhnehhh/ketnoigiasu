@@ -47,6 +47,16 @@ public class TutorProfile {
     private String bankAccount;   // Số tài khoản
     private String bankOwner;     // Tên chủ tài khoản
 
+    // Hình thức dạy: ONLINE | OFFLINE | BOTH
+    private String teachingMode;
+
+    // Giới thiệu bản thân (hiển thị công khai cho học viên)
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
+    // Ảnh đại diện (lưu đường dẫn file upload)
+    private String avatarUrl;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

@@ -33,8 +33,36 @@ public class CourseRegistrationService {
                 .orElseThrow(() -> new RuntimeException("Khóa học không tồn tại"));
         if (!"APPROVED".equals(course.getStatus().name()))
             throw new RuntimeException("Khóa học này hiện chưa được kiểm duyệt!");
+
+        // Tự động hủy các đăng ký APPROVED mà hóa đơn TUITION_FEE đã hết hạn (chưa thanh toán)
+        registrationRepository.findByCourseId(courseId).stream()
+                .filter(r -> "APPROVED".equals(r.getStatus()))
+                .forEach(r -> {
+                    boolean invoiceExpired = paymentRepository.findByUserIdOrderByCreatedAtDesc(
+                            r.getStudent().getUser().getId()).stream()
+                            .anyMatch(p -> "TUITION_FEE".equals(p.getPaymentType())
+                                    && p.getRegistration() != null
+                                    && p.getRegistration().getId().equals(r.getId())
+                                    && p.getStatus() == PaymentStatus.PENDING
+                                    && p.getExpiresAt() != null
+                                    && LocalDateTime.now().isAfter(p.getExpiresAt()));
+                    if (invoiceExpired) {
+                        r.setStatus("REJECTED");
+                        registrationRepository.save(r);
+                    }
+                });
+
+        // 1 lớp chỉ 1 học viên — check APPROVED hoặc ACTIVE (không block nếu COMPLETED vì lớp đã xong)
+        boolean hasActiveStudent = registrationRepository.findByCourseId(courseId).stream()
+                .anyMatch(r -> "APPROVED".equals(r.getStatus()) || "ACTIVE".equals(r.getStatus()));
+        if (hasActiveStudent)
+            throw new RuntimeException("Khóa học này đã có học viên. Vui lòng tìm khóa học khác.");
+
+        // Không cho đăng ký lại nếu đã có đơn PENDING hoặc APPROVED/ACTIVE
+        // (REJECTED do hóa đơn hết hạn đã được xử lý ở trên → cho đăng ký lại bình thường)
         boolean exists = registrationRepository.findByStudentUserId(user.getId()).stream()
-                .anyMatch(r -> r.getCourse().getId().equals(courseId));
+                .anyMatch(r -> r.getCourse().getId().equals(courseId)
+                        && !("REJECTED".equals(r.getStatus()) || "COMPLETED".equals(r.getStatus())));
         if (exists) throw new RuntimeException("Bạn đã đăng ký khóa học này rồi!");
 
         CourseRegistration reg = CourseRegistration.builder()
@@ -65,11 +93,33 @@ public class CourseRegistrationService {
         if (!reg.getCourse().getTutor().getUser().getEmail().equals(email))
             throw new RuntimeException("Bạn không có quyền duyệt hồ sơ này!");
 
+        // Khi duyệt: kiểm tra xem đã có học viên APPROVED/ACTIVE chưa
+        if ("APPROVED".equalsIgnoreCase(status)) {
+            boolean hasActiveStudent = registrationRepository.findByCourseId(reg.getCourse().getId())
+                    .stream()
+                    .filter(r -> !r.getId().equals(registrationId)) // bỏ qua đơn hiện tại
+                    .anyMatch(r -> "APPROVED".equals(r.getStatus()) || "ACTIVE".equals(r.getStatus()));
+            if (hasActiveStudent)
+                throw new RuntimeException("Lớp học đã có học viên khác. Không thể duyệt thêm.");
+        }
+
         reg.setStatus(status);
         CourseRegistration savedRegistration = registrationRepository.save(reg);
 
         if ("APPROVED".equalsIgnoreCase(status)) {
             Double totalAmount = reg.getCourse().getPricePerSession() * reg.getCourse().getTotalSessions();
+
+            // Tự động từ chối các đơn PENDING khác của cùng khóa học
+            registrationRepository.findByCourseId(reg.getCourse().getId()).stream()
+                    .filter(r -> !r.getId().equals(registrationId) && "PENDING".equals(r.getStatus()))
+                    .forEach(r -> {
+                        r.setStatus("REJECTED");
+                        registrationRepository.save(r);
+                        notificationService.createNotification(r.getStudent().getUser(),
+                                "❌ Đơn đăng ký lớp '" + reg.getCourse().getTitle() + "' đã bị từ chối vì lớp đã có học viên khác.",
+                                "/student");
+                    });
+
             Payment tuitionFee = Payment.builder()
                     .user(reg.getStudent().getUser())
                     .course(reg.getCourse())
@@ -77,7 +127,7 @@ public class CourseRegistrationService {
                     .paymentType("TUITION_FEE")
                     .amount(totalAmount)
                     .status(PaymentStatus.PENDING)
-                    .expiresAt(LocalDateTime.now().plusHours(24))
+                    .expiresAt(LocalDateTime.now().plusDays(7))
                     .build();
             Payment savedPayment = paymentRepository.save(tuitionFee);
 

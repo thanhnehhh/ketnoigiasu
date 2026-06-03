@@ -102,8 +102,7 @@ public class CourseService {
                 .stream().map(this::mapToResponse).toList();
 
         return results.stream()
-                .sorted(Comparator.comparing(CourseResponse::isPromoted).reversed()
-                        .thenComparing(Comparator.comparingDouble(CourseResponse::getScore).reversed()))
+                .sorted(Comparator.comparingDouble(CourseResponse::getScore).reversed())
                 .toList();
     }
 
@@ -181,17 +180,22 @@ public class CourseService {
     }
 
     private double calculateScore(Course course, Double avgRating, long totalRegistrations) {
-        double promotedBonus = course.isPromoted() ? 1000.0 : 0.0;
         double ratingScore = (avgRating != null ? avgRating : 0.0) * 150.0;
         double popularityScore = totalRegistrations * 8.0;
         long daysSinceCreated = course.getCreatedAt() != null
                 ? ChronoUnit.DAYS.between(course.getCreatedAt(), LocalDateTime.now()) : 0;
-        return promotedBonus + ratingScore + popularityScore - daysSinceCreated * 0.3;
+        double promotedBonus = course.isPromoted() ? 500.0 : 0.0;
+        return ratingScore + popularityScore - daysSinceCreated * 0.3 + promotedBonus;
     }
 
     private CourseResponse mapToResponse(Course course) {
         Double avgRating = reviewRepository.getAvgRatingByCourseId(course.getId());
-        long totalRegistrations = registrationRepository.countByCourseId(course.getId());
+        // Chỉ đếm học viên đang học (ACTIVE) — không đếm PENDING/REJECTED/COMPLETED
+        long totalRegistrations = registrationRepository.countByCourseIdAndStatus(course.getId(), "ACTIVE");
+        // Lớp đầy khi có học viên APPROVED (chờ thanh toán) hoặc ACTIVE (đang học)
+        long approvedCount = registrationRepository.findByCourseId(course.getId()).stream()
+                .filter(r -> "APPROVED".equals(r.getStatus()) || "ACTIVE".equals(r.getStatus()))
+                .count();
         double score = calculateScore(course, avgRating, totalRegistrations);
         return CourseResponse.builder()
                 .id(course.getId()).title(course.getTitle()).description(course.getDescription())
@@ -205,6 +209,7 @@ public class CourseService {
                 .registrationCount((int) totalRegistrations)
                 .score(Math.round(score * 10.0) / 10.0)
                 .teachingMode(course.getTeachingMode() != null ? course.getTeachingMode() : "BOTH")
+                .hasApprovedStudent(approvedCount > 0)
                 .build();
     }
 }

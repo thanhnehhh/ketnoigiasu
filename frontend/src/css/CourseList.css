@@ -305,6 +305,7 @@
 }
 .btn-register-course:hover { opacity: 0.9; }
 .btn-register-course:disabled { background: #10b981; cursor: default; }
+.btn-register-course.btn-full { background: #94a3b8; cursor: not-allowed; }
 
 .register-feedback {
     font-size: 0.8rem;

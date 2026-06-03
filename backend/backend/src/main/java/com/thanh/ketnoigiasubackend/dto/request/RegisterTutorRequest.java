@@ -24,4 +24,5 @@ public class RegisterTutorRequest {
 
     private List<String> subjects;
     private List<String> grades;
+    private String teachingMode; // ONLINE | OFFLINE | BOTH
 }

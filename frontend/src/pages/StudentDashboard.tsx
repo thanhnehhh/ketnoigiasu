@@ -78,10 +78,22 @@ export default function StudentDashboard() {
     const [loading, setLoading] = useState(true);
 
     // Modal nộp proof
-    const [proofModal, setProofModal] = useState<{ open: boolean; paymentId: number | null }>({ open: false, paymentId: null });
+    const [proofModal, setProofModal] = useState<{ open: boolean; paymentId: number | null; payment: Payment | null }>({ open: false, paymentId: null, payment: null });
     const [proofFile, setProofFile] = useState<File | null>(null);
     const [proofMsg, setProofMsg] = useState('');
     const [submittingProof, setSubmittingProof] = useState(false);
+
+    // VietQR modal
+    const [vietQRModal, setVietQRModal] = useState<{ open: boolean; payment: Payment | null }>({ open: false, payment: null });
+    const [adminPayInfo, setAdminPayInfo] = useState<{ bankName: string; bankAccount: string; bankOwner: string; qrImageUrl: string } | null>(null);
+
+    // ZaloPay
+    const [zaloPayModal, setZaloPayModal] = useState<{ open: boolean; payment: Payment | null }>({ open: false, payment: null });
+    const [zaloOrderUrl, setZaloOrderUrl] = useState('');
+    const [zaloAppTransId, setZaloAppTransId] = useState('');
+    const [zaloMsg, setZaloMsg] = useState('');
+    const [zaloLoading, setZaloLoading] = useState(false);
+    const [pollingInterval, setPollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
     // Modal yêu cầu hoàn tiền
     const [refundModal, setRefundModal] = useState<{ open: boolean; payment: Payment | null }>({ open: false, payment: null });
@@ -92,6 +104,7 @@ export default function StudentDashboard() {
 
     useEffect(() => {
         fetchAll();
+        api.get('/public/payment-info').then(res => setAdminPayInfo(res.data)).catch(console.error);
     }, []);
 
     const fetchAll = async () => {
@@ -149,7 +162,74 @@ export default function StudentDashboard() {
         } finally { setSubmittingProof(false); }
     };
 
-    const submitRefund = async () => {
+    // ===== ZALOPAY =====
+    const openZaloPay = async (pay: Payment) => {
+        setZaloPayModal({ open: true, payment: pay });
+        setZaloMsg('⏳ Đang tạo đơn hàng ZaloPay...');
+        setZaloLoading(true);
+        setZaloOrderUrl('');
+        setZaloAppTransId('');
+        try {
+            const res = await api.post(`/payments/${pay.id}/zalopay/create`);
+            if (res.data.return_code === 1) {
+                setZaloOrderUrl(res.data.order_url);
+                setZaloAppTransId(res.data.app_trans_id);
+                setZaloMsg('✅ Đơn hàng tạo thành công! Bấm nút bên dưới để thanh toán.');
+                // Bắt đầu polling
+                startPolling(pay.id, res.data.app_trans_id);
+            } else {
+                setZaloMsg('❌ Lỗi tạo đơn: ' + (res.data.return_message || 'Thử lại sau'));
+            }
+        } catch (e: any) {
+            setZaloMsg('❌ ' + (e.response?.data?.error || 'Không kết nối được ZaloPay'));
+        } finally { setZaloLoading(false); }
+    };
+
+    const startPolling = (paymentId: number, appTransId: string) => {
+        if (pollingInterval) clearInterval(pollingInterval);
+        let approved = false; // flag đảm bảo chỉ xử lý 1 lần
+        const interval = setInterval(async () => {
+            if (approved) return; // đã xử lý rồi, bỏ qua
+            try {
+                const res = await api.get(`/payments/${paymentId}/zalopay/query`, { params: { appTransId } });
+                if (res.data.return_code === 1) {
+                    approved = true; // đánh dấu ngay lập tức trước khi làm gì khác
+                    clearInterval(interval);
+                    setPollingInterval(null);
+                    setZaloMsg('🎉 Thanh toán thành công! Lớp học đã được kích hoạt.');
+                    setZaloOrderUrl('');
+                    fetchAll();
+                    setTimeout(() => setZaloPayModal({ open: false, payment: null }), 2500);
+                } else if (res.data.return_code === 2) {
+                    clearInterval(interval);
+                    setPollingInterval(null);
+                    setZaloMsg('❌ Thanh toán thất bại hoặc bị hủy.');
+                }
+            } catch { /* ignore polling errors */ }
+        }, 3000);
+        setPollingInterval(interval);
+    };
+
+    const closeZaloModal = () => {
+        if (pollingInterval) clearInterval(pollingInterval);
+        setPollingInterval(null);
+        setZaloPayModal({ open: false, payment: null });
+        setZaloMsg(''); setZaloOrderUrl(''); setZaloAppTransId('');
+    };
+
+    // ===== VNPAY =====
+    const openVNPay = async (paymentId: number) => {
+        try {
+            const res = await api.post(`/payments/${paymentId}/vnpay/create`);
+            if (res.data.paymentUrl) {
+                window.location.href = res.data.paymentUrl; // redirect sang VNPay
+            } else {
+                alert('❌ Không tạo được link VNPay: ' + (res.data.error || 'Lỗi không xác định'));
+            }
+        } catch (e: any) {
+            alert('❌ ' + (e.response?.data?.error || 'Lỗi kết nối'));
+        }
+    };    const submitRefund = async () => {
         if (!refundReason.trim()) { setRefundMsg('❌ Vui lòng nhập lý do hoàn tiền'); return; }
         setSubmittingRefund(true);
         try {
@@ -289,28 +369,29 @@ export default function StudentDashboard() {
                                                                 {isExpired && ' (Đã hết hạn)'}
                                                             </p>
                                                         )}
-                                                        {/* Thông tin chuyển khoản — hiện khi cần nộp tiền */}
-                                                        {pay.status === 'PENDING' && !isExpired && pay.tutorBankAccount && (
-                                                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', margin: '8px 0', fontSize: '0.88rem' }}>
-                                                                <p style={{ fontWeight: 700, color: '#065f46', margin: '0 0 6px' }}>🏦 Thông tin chuyển khoản:</p>
-                                                                <p style={{ margin: '2px 0', color: '#374151' }}>Ngân hàng: <strong>{pay.tutorBankName}</strong></p>
-                                                                <p style={{ margin: '2px 0', color: '#374151' }}>Số TK: <strong style={{ fontSize: '1rem', letterSpacing: '1px' }}>{pay.tutorBankAccount}</strong></p>
-                                                                <p style={{ margin: '2px 0', color: '#374151' }}>Chủ TK: <strong>{pay.tutorBankOwner}</strong></p>
-                                                                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '0.8rem' }}>Nội dung CK: <strong>HocPhi #{pay.id}</strong></p>
-                                                            </div>
-                                                        )}
-                                                        {pay.status === 'PENDING' && !isExpired && !pay.tutorBankAccount && (
-                                                            <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '10px', padding: '10px 14px', margin: '8px 0', fontSize: '0.85rem', color: '#92400e' }}>
-                                                                ⚠️ Gia sư chưa cập nhật thông tin tài khoản. Vui lòng liên hệ gia sư qua chat.
-                                                            </div>
-                                                        )}
+                                                        {/* Thông tin chuyển khoản → nút VietQR */}
                                                         <div className="reg-actions">
                                                             {pay.status === 'PENDING' && !isExpired && (
-                                                                <button className="btn-sm btn-primary"
-                                                                    onClick={() => { setProofModal({ open: true, paymentId: pay.id }); setProofMsg(''); }}>
-                                                                    📤 Nộp minh chứng
-                                                                </button>
-                                                            )}                                                            {pay.status === 'SUCCESS' && !hasRefund && (
+                                                                <>
+                                                                    <button className="btn-sm btn-primary"
+                                                                        onClick={() => { setProofModal({ open: true, paymentId: pay.id, payment: pay }); setProofMsg(''); }}>
+                                                                        📤 Nộp minh chứng
+                                                                    </button>
+                                                                    <button className="btn-sm" style={{ background: '#005BAA', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}
+                                                                        onClick={() => setVietQRModal({ open: true, payment: pay })}>
+                                                                        📱 VietQR
+                                                                    </button>
+                                                                    <button className="btn-sm" style={{ background: '#0068ff', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}
+                                                                        onClick={() => openZaloPay(pay)}>
+                                                                        💙 ZaloPay
+                                                                    </button>
+                                                                    <button className="btn-sm" style={{ background: '#e5001a', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}
+                                                                        onClick={() => openVNPay(pay.id)}>
+                                                                        🏦 VNPay
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            {pay.status === 'SUCCESS' && !hasRefund && (
                                                                 <button className="btn-sm btn-danger"
                                                                     onClick={() => { setRefundModal({ open: true, payment: pay }); setRefundMsg(''); setRefundReason(''); setRefundEvidenceFile(null); }}>
                                                                     🔄 Yêu cầu hoàn tiền
@@ -397,7 +478,7 @@ export default function StudentDashboard() {
 
             {/* MODAL NỘP PROOF */}
             {proofModal.open && (
-                <div className="modal-overlay" onClick={() => setProofModal({ open: false, paymentId: null })}>
+                <div className="modal-overlay" onClick={() => setProofModal({ open: false, paymentId: null, payment: null })}>
                     <div className="modal-box" onClick={e => e.stopPropagation()}>
                         <h3>📤 Nộp minh chứng chuyển khoản</h3>
                         <p style={{ color: '#64748b', marginBottom: '1rem' }}>
@@ -416,7 +497,139 @@ export default function StudentDashboard() {
                             <button className="btn-primary" onClick={submitProof} disabled={submittingProof}>
                                 {submittingProof ? '⏳ Đang gửi...' : 'Xác nhận nộp'}
                             </button>
-                            <button className="btn-outline" onClick={() => { setProofModal({ open: false, paymentId: null }); setProofFile(null); setProofMsg(''); }}>Hủy</button>
+                            <button className="btn-outline" onClick={() => { setProofModal({ open: false, paymentId: null, payment: null }); setProofFile(null); setProofMsg(''); }}>Hủy</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL VIETQR */}
+            {vietQRModal.open && vietQRModal.payment && (() => {
+                const transferContent = `HocPhi ${vietQRModal.payment.id} ${user?.fullName?.replace(/\s+/g, '') || ''}`;
+                return (
+                <div className="modal-overlay" onClick={() => setVietQRModal({ open: false, payment: null })}>
+                    <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                        {/* Header */}
+                        <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#005BAA', color: 'white', padding: '8px 18px', borderRadius: '20px', fontWeight: 700, fontSize: '1rem' }}>
+                                <span>📱</span> VietQR Chuyển khoản
+                            </div>
+                        </div>
+
+                        {/* Số tiền */}
+                        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                            <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 4px' }}>Số tiền cần chuyển</p>
+                            <p style={{ fontSize: '1.8rem', fontWeight: 800, color: '#005BAA', margin: 0 }}>
+                                {vietQRModal.payment.amount?.toLocaleString('vi-VN')}đ
+                            </p>
+                        </div>
+
+                        {/* QR Image */}
+                        {adminPayInfo?.qrImageUrl ? (
+                            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                                <img
+                                    src={`http://localhost:8080/api/materials/download/${adminPayInfo.qrImageUrl}`}
+                                    alt="QR chuyển khoản"
+                                    style={{ width: 220, height: 220, objectFit: 'contain', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: '#f8fafc', borderRadius: '12px', marginBottom: '1rem' }}>
+                                <p>⚠️ Admin chưa cập nhật ảnh QR</p>
+                            </div>
+                        )}
+
+                        {/* Thông tin tài khoản */}
+                        {adminPayInfo?.bankAccount && (
+                            <div style={{ background: '#f0f7ff', border: '1.5px solid #bfdbfe', borderRadius: '12px', padding: '12px 16px', marginBottom: '1rem', fontSize: '0.88rem' }}>
+                                <p style={{ fontWeight: 700, color: '#1e40af', margin: '0 0 8px' }}>🏦 Thông tin tài khoản</p>
+                                <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '6px 8px', color: '#374151' }}>
+                                    <span style={{ color: '#64748b' }}>Ngân hàng:</span>
+                                    <strong>{adminPayInfo.bankName}</strong>
+                                    <span style={{ color: '#64748b' }}>Số TK:</span>
+                                    <strong style={{ letterSpacing: '1px', fontSize: '1rem', color: '#005BAA' }}>{adminPayInfo.bankAccount}</strong>
+                                    <span style={{ color: '#64748b' }}>Chủ TK:</span>
+                                    <strong>{adminPayInfo.bankOwner}</strong>
+                                    <span style={{ color: '#64748b' }}>Số tiền:</span>
+                                    <strong style={{ color: '#005BAA' }}>{vietQRModal.payment.amount?.toLocaleString('vi-VN')}đ</strong>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Nội dung chuyển khoản — nổi bật + copy */}
+                        <div style={{ background: '#fff7ed', border: '2px solid #fed7aa', borderRadius: '12px', padding: '12px 16px', marginBottom: '1rem' }}>
+                            <p style={{ fontSize: '0.82rem', color: '#92400e', fontWeight: 600, margin: '0 0 6px' }}>
+                                ⚠️ Nội dung chuyển khoản (bắt buộc nhập đúng)
+                            </p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <code style={{ flex: 1, background: 'white', border: '1.5px solid #fed7aa', borderRadius: '8px', padding: '8px 12px', fontSize: '1rem', fontWeight: 700, color: '#ef4444', letterSpacing: '0.5px' }}>
+                                    {transferContent}
+                                </code>
+                                <button
+                                    onClick={() => { navigator.clipboard.writeText(transferContent); alert('✅ Đã copy nội dung!'); }}
+                                    style={{ background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                    📋 Copy
+                                </button>
+                            </div>
+                            <p style={{ fontSize: '0.78rem', color: '#92400e', margin: '6px 0 0' }}>
+                                Khóa học: <strong>{vietQRModal.payment.courseTitle}</strong>
+                            </p>
+                        </div>
+
+                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', marginBottom: '1rem' }}>
+                            Sau khi chuyển khoản, vui lòng nộp minh chứng để Admin xác nhận
+                        </p>
+
+                        <div className="modal-actions">
+                            <button className="btn-primary" onClick={() => {
+                                setVietQRModal({ open: false, payment: null });
+                                setProofModal({ open: true, paymentId: vietQRModal.payment!.id, payment: vietQRModal.payment });
+                                setProofMsg('');
+                            }}>📤 Nộp minh chứng</button>
+                            <button className="btn-outline" onClick={() => setVietQRModal({ open: false, payment: null })}>Đóng</button>
+                        </div>
+                    </div>
+                </div>
+                );
+            })()}
+
+            {/* MODAL ZALOPAY */}            {zaloPayModal.open && zaloPayModal.payment && (
+                <div className="modal-overlay" onClick={closeZaloModal}>
+                    <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                            <div style={{ fontSize: '2rem', marginBottom: '4px' }}>💙</div>
+                            <h3 style={{ margin: 0, color: '#0068ff' }}>Thanh toán qua ZaloPay</h3>
+                        </div>
+                        <div style={{ background: '#f0f7ff', borderRadius: '10px', padding: '12px 16px', marginBottom: '1rem', fontSize: '0.88rem' }}>
+                            <p style={{ margin: '2px 0' }}>📚 <strong>{zaloPayModal.payment.courseTitle}</strong></p>
+                            <p style={{ margin: '2px 0' }}>💰 Số tiền: <strong style={{ color: '#0068ff', fontSize: '1.1rem' }}>{zaloPayModal.payment.amount?.toLocaleString('vi-VN')}đ</strong></p>
+                            <p style={{ margin: '2px 0', fontSize: '0.8rem', color: '#64748b' }}>
+                                Nội dung: <em>KetNoiGiaSu - {user?.fullName} thanh toan hoc phi - Ma HD #{zaloPayModal.payment.id}</em>
+                            </p>
+                        </div>
+
+                        <p style={{ textAlign: 'center', color: zaloMsg.startsWith('🎉') ? '#10b981' : zaloMsg.startsWith('❌') ? '#ef4444' : '#64748b', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                            {zaloMsg || '⏳ Đang xử lý...'}
+                        </p>
+
+                        {zaloOrderUrl && (
+                            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                                <a href={zaloOrderUrl} target="_blank" rel="noopener noreferrer"
+                                    style={{ display: 'inline-block', background: '#0068ff', color: 'white', padding: '12px 28px', borderRadius: '10px', fontWeight: 700, textDecoration: 'none', fontSize: '1rem' }}>
+                                    💙 Mở ZaloPay để thanh toán
+                                </a>
+                                <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '8px' }}>
+                                    Hệ thống tự động xác nhận sau khi bạn thanh toán xong
+                                </p>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '6px', color: '#64748b', fontSize: '0.8rem' }}>
+                                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#10b981', animation: 'pulse 1.5s infinite' }} />
+                                    Đang chờ xác nhận thanh toán...
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="modal-actions">
+                            <button className="btn-outline" onClick={closeZaloModal}>Đóng</button>
                         </div>
                     </div>
                 </div>

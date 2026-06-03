@@ -299,4 +299,58 @@ public class PaymentService {
                 .transferProofUrl(payment.getTransferProofUrl())
                 .build();
     }
+
+    /** ZaloPay thanh toán thành công → tự động duyệt hóa đơn, kích hoạt lớp học */
+    @Transactional
+    public void autoApproveByZaloPay(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId).orElse(null);
+        if (payment == null || payment.getStatus() == PaymentStatus.SUCCESS) return;
+        payment.setStatus(PaymentStatus.SUCCESS);
+        payment.setVerifiedAt(LocalDateTime.now());
+        payment.setProofImageUrl("zalopay_auto");
+        paymentRepository.save(payment);
+
+        // Kích hoạt đăng ký học
+        if (payment.getRegistration() != null) {
+            payment.getRegistration().setStatus("ACTIVE");
+            registrationRepository.save(payment.getRegistration());
+            notificationService.createNotification(payment.getUser(),
+                    "✅ Thanh toán ZaloPay thành công! Lớp học '" +
+                    payment.getRegistration().getCourse().getTitle() + "' đã được kích hoạt.",
+                    "/student");
+            notificationService.createNotification(
+                    payment.getRegistration().getCourse().getTutor().getUser(),
+                    "💰 Học viên " + payment.getUser().getFullName() +
+                    " đã thanh toán học phí qua ZaloPay cho lớp '" +
+                    payment.getRegistration().getCourse().getTitle() + "'.",
+                    "/tutor");
+        }
+    }
+
+    /** VNPay thanh toán thành công → tự động duyệt hóa đơn, kích hoạt lớp học */
+    @Transactional
+    public void autoApproveByVNPay(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId).orElse(null);
+        if (payment == null || payment.getStatus() == PaymentStatus.SUCCESS) return;
+        payment.setStatus(PaymentStatus.SUCCESS);
+        payment.setVerifiedAt(LocalDateTime.now());
+        payment.setProofImageUrl("vnpay_auto");
+        paymentRepository.save(payment);
+
+        // Kích hoạt đăng ký học
+        if (payment.getRegistration() != null) {
+            payment.getRegistration().setStatus("ACTIVE");
+            registrationRepository.save(payment.getRegistration());
+            notificationService.createNotification(payment.getUser(),
+                    "✅ Thanh toán VNPay thành công! Lớp học '" +
+                    payment.getRegistration().getCourse().getTitle() + "' đã được kích hoạt.",
+                    "/student");
+            notificationService.createNotification(
+                    payment.getRegistration().getCourse().getTutor().getUser(),
+                    "💰 Học viên " + payment.getUser().getFullName() +
+                    " đã thanh toán học phí qua VNPay cho lớp '" +
+                    payment.getRegistration().getCourse().getTitle() + "'.",
+                    "/tutor");
+        }
+    }
 }

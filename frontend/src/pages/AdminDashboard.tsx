@@ -94,7 +94,19 @@ export default function AdminDashboard() {
     const [refundModal, setRefundModal] = useState<{ open: boolean; refund: RefundRequest | null }>({ open: false, refund: null });
     const [refundNote, setRefundNote] = useState('');
 
-    useEffect(() => { fetchAll(); }, []);
+    // VietQR config
+    const [vietQRConfig, setVietQRConfig] = useState({ bankName: '', bankAccount: '', bankOwner: '' });
+    const [vietQRFile, setVietQRFile] = useState<File | null>(null);
+    const [vietQRMsg, setVietQRMsg] = useState('');
+    const [vietQRPreview, setVietQRPreview] = useState<string>('');
+
+    useEffect(() => {
+        fetchAll();
+        api.get('/public/payment-info').then(res => {
+            setVietQRConfig({ bankName: res.data.bankName || '', bankAccount: res.data.bankAccount || '', bankOwner: res.data.bankOwner || '' });
+            if (res.data.qrImageUrl) setVietQRPreview(res.data.qrImageUrl);
+        }).catch(console.error);
+    }, []);
 
     const fetchAll = async () => {
         setLoading(true);
@@ -127,6 +139,23 @@ export default function AdminDashboard() {
     const flash = (text: string, err = false) => {
         setMsg(text); setIsErr(err);
         setTimeout(() => setMsg(''), 3000);
+    };
+
+    const saveVietQR = async () => {
+        try {
+            await api.put('/admin/payment-info', vietQRConfig);
+            if (vietQRFile) {
+                const fd = new FormData();
+                fd.append('file', vietQRFile);
+                const res = await api.post('/admin/payment-info/qr', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                setVietQRPreview(res.data.qrImageUrl);
+                setVietQRFile(null);
+            }
+            setVietQRMsg('✅ Đã lưu thông tin VietQR!');
+            setTimeout(() => setVietQRMsg(''), 3000);
+        } catch (e: any) {
+            setVietQRMsg('❌ ' + (e.response?.data?.message || 'Lỗi lưu'));
+        }
     };
 
     // Format số gọn: 48.000.000 → 48 triệu, 4.800.000 → 4,8 triệu
@@ -607,6 +636,51 @@ export default function AdminDashboard() {
                                         </div>
                                     )}
 
+                                    {/* Cấu hình VietQR */}
+                                    <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', border: '1.5px solid #e2e8f0' }}>
+                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#005BAA', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span>📱</span> Cấu hình VietQR (học viên quét QR để thanh toán)
+                                        </h3>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1rem' }}>
+                                            <div>
+                                                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Tên ngân hàng</label>
+                                                <input className="modal-input" value={vietQRConfig.bankName}
+                                                    onChange={e => setVietQRConfig(p => ({ ...p, bankName: e.target.value }))}
+                                                    placeholder="VD: Vietcombank" />
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Số tài khoản</label>
+                                                <input className="modal-input" value={vietQRConfig.bankAccount}
+                                                    onChange={e => setVietQRConfig(p => ({ ...p, bankAccount: e.target.value }))}
+                                                    placeholder="VD: 0123456789" />
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Tên chủ tài khoản</label>
+                                                <input className="modal-input" value={vietQRConfig.bankOwner}
+                                                    onChange={e => setVietQRConfig(p => ({ ...p, bankOwner: e.target.value }))}
+                                                    placeholder="VD: NGUYEN VAN A" />
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Ảnh QR từ thiết bị</label>
+                                                <input type="file" accept="image/*"
+                                                    onChange={e => setVietQRFile(e.target.files?.[0] || null)}
+                                                    style={{ fontSize: '0.85rem', width: '100%' }} />
+                                                {vietQRFile && <p style={{ fontSize: '0.78rem', color: '#10b981', marginTop: '2px' }}>✅ {vietQRFile.name}</p>}
+                                            </div>
+                                        </div>
+                                        {vietQRPreview && (
+                                            <div style={{ marginBottom: '1rem' }}>
+                                                <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '6px' }}>Ảnh QR hiện tại:</p>
+                                                <img src={`http://localhost:8080/api/materials/download/${vietQRPreview}`}
+                                                    alt="QR" style={{ width: 160, height: 160, objectFit: 'contain', borderRadius: '10px', border: '1.5px solid #e2e8f0' }} />
+                                            </div>
+                                        )}
+                                        {vietQRMsg && <p style={{ color: vietQRMsg.startsWith('✅') ? '#10b981' : '#ef4444', fontSize: '0.88rem', marginBottom: '8px' }}>{vietQRMsg}</p>}
+                                        <button className="btn-primary" onClick={saveVietQR} style={{ padding: '10px 24px' }}>
+                                            💾 Lưu cấu hình VietQR
+                                        </button>
+                                    </div>
+
                                     {/* Chuyển tiền học phí cho gia sư */}
                                     <div id="section-transfer" style={{ marginBottom: '1rem', marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
@@ -695,8 +769,7 @@ export default function AdminDashboard() {
                                         )}
                                     </div>
                                     {refunds.length === 0 ? (
-                                        <div className="empty-state"><p>Không có yêu cầu hoàn tiền nào đang chờ.</p></div>
-                                    ) : (
+                                        <div className="empty-state"><p>Không có yêu cầu hoàn tiền nào đang chờ.</p></div>                                    ) : (
                                         <div className="card-list">
                                             {refunds.map(r => (
                                                 <div key={r.id} className="reg-card">

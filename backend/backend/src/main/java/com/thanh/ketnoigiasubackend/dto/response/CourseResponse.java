@@ -28,4 +28,5 @@ public class CourseResponse {
     private Integer registrationCount;
     private Double score;
     private String teachingMode; // ONLINE | OFFLINE | BOTH
+    private boolean hasApprovedStudent; // true nếu đã có học viên được duyệt (lớp đầy)
 }

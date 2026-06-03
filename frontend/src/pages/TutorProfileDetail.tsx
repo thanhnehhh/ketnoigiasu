@@ -33,6 +33,9 @@ interface TutorProfile {
     grades: string[];
     courses: Course[];
     avatar: string | null;
+    bio: string | null;
+    avatarUrl: string | null;
+    teachingMode: string | null;
 }
 
 interface Course {
@@ -101,7 +104,9 @@ export default function TutorProfileDetail() {
                 {/* HEADER PROFILE */}
                 <div className="tp-header">
                     <img
-                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profile.fullName)}&background=4f46e5&color=fff&size=100&bold=true&rounded=true`}
+                        src={profile.avatarUrl
+                            ? `http://localhost:8080/api/materials/download/${profile.avatarUrl}`
+                            : `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.fullName)}&background=4f46e5&color=fff&size=100&bold=true&rounded=true`}
                         alt={profile.fullName}
                         className="tp-avatar"
                     />
@@ -114,6 +119,13 @@ export default function TutorProfileDetail() {
                             {profile.graduationYear && <span> ({profile.graduationYear})</span>}
                         </p>
                         {profile.address && <p className="tp-location">📍 {profile.address}</p>}
+                        {profile.teachingMode && (
+                            <p className="tp-location">
+                                {profile.teachingMode === 'ONLINE' ? '🌐 Dạy Online' :
+                                 profile.teachingMode === 'OFFLINE' ? '🏠 Dạy tại nhà (Offline)' :
+                                 '🌐🏠 Online & Offline'}
+                            </p>
+                        )}
                         <div className="tp-verified">
                             <span className="verified-chip">✓ Đã xác minh CCCD</span>
                             <span className="verified-chip">✓ Hợp đồng ký kết</span>
@@ -124,6 +136,14 @@ export default function TutorProfileDetail() {
                 <div className="tp-body">
                     {/* CỘT TRÁI */}
                     <div className="tp-left">
+                        {/* Giới thiệu bản thân */}
+                        {profile.bio && (
+                            <div className="tp-section tp-bio-section">
+                                <h3>👋 Giới thiệu</h3>
+                                <p className="tp-bio">{profile.bio}</p>
+                            </div>
+                        )}
+
                         {/* Môn dạy */}
                         {subjectList.length > 0 && (
                             <div className="tp-section">
