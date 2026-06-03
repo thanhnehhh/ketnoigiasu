@@ -22,6 +22,7 @@ interface Course {
     registrationCount: number;
     score: number;
     teachingMode: string;
+    hasApprovedStudent: boolean;
 }
 
 interface Subject {
@@ -199,7 +200,7 @@ export default function CourseList() {
                 <section className="course-results">
                     <div className="results-header">
                         <p>Tìm thấy <strong>{courses.length}</strong> khóa học</p>
-                        <span className="sort-note">Sắp xếp theo: Đẩy tin → Đánh giá → Độ phổ biến</span>
+                        <span className="sort-note">Sắp xếp theo: Đánh giá → Độ phổ biến → Đẩy tin</span>
                     </div>
 
                     {loading ? (
@@ -242,13 +243,19 @@ export default function CourseList() {
                                         <div className="course-actions">
                                             <Link to={`/courses/${c.id}`} className="btn-detail">Chi tiết</Link>
                                             {user?.role === 'STUDENT' && (
-                                                <button
-                                                    className="btn-register-course"
-                                                    onClick={() => registerCourse(c.id)}
-                                                    disabled={!!registerMsg[c.id]}
-                                                >
-                                                    {registerMsg[c.id] ? '✓ Đã gửi' : 'Đăng ký'}
-                                                </button>
+                                                c.hasApprovedStudent || c.registrationCount >= 1 ? (
+                                                    <button className="btn-register-course btn-full" disabled>
+                                                        🔒 Đã có học viên
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        className="btn-register-course"
+                                                        onClick={() => registerCourse(c.id)}
+                                                        disabled={!!registerMsg[c.id]}
+                                                    >
+                                                        {registerMsg[c.id] ? '✓ Đã gửi' : 'Đăng ký'}
+                                                    </button>
+                                                )
                                             )}
                                         </div>
                                         {registerMsg[c.id] && (

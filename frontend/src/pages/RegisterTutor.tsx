@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import PasswordInput from '../components/PasswordInput';
+import { VIETNAM_PROVINCES, getDistricts } from '../data/vietnamDistricts';
 import '../css/RegisterTutor.css';
 
 /**
@@ -17,7 +18,7 @@ import '../css/RegisterTutor.css';
 type Step = 'email' | 'info';
 
 const SUBJECTS = ['Toán', 'Lý', 'Hóa', 'Văn', 'Tiếng Anh', 'Tiếng Trung', 'Tiếng Nhật', 'IELTS', 'TOEIC', 'Lịch sử', 'Địa lý', 'Sinh học', 'Tin học'];
-const GRADES   = [...Array.from({ length: 12 }, (_, i) => `Lớp ${i + 1}`), 'Đại học', 'Ngoại ngữ'];
+const GRADES   = [...Array.from({ length: 12 }, (_, i) => `Lớp ${i + 1}`), 'Ngoại ngữ'];
 
 export default function RegisterTutor() {
     const navigate = useNavigate();
@@ -40,7 +41,9 @@ export default function RegisterTutor() {
     const [dateOfBirth, setDateOfBirth]         = useState('');
     const [cccd, setCccd]                       = useState('');
     const [cccdIssuedPlace, setCccdIssuedPlace] = useState('');
-    const [address, setAddress]                 = useState('');
+    const [addrProvince, setAddrProvince]       = useState('');
+    const [addrDistrict, setAddrDistrict]       = useState('');
+    const [addrDetail, setAddrDetail]           = useState('');
     const [phone, setPhone]                     = useState('');
     const [school, setSchool]                   = useState('');
     const [major, setMajor]                     = useState('');
@@ -49,6 +52,7 @@ export default function RegisterTutor() {
     const [strengths, setStrengths]             = useState('');
     const [subjects, setSubjects]               = useState<string[]>([]);
     const [grades, setGrades]                   = useState<string[]>([]);
+    const [teachingMode, setTeachingMode]       = useState('BOTH');
 
     const toggle = (list: string[], setList: (v: string[]) => void, val: string) => {
         setList(list.includes(val) ? list.filter(v => v !== val) : [...list, val]);
@@ -90,7 +94,7 @@ export default function RegisterTutor() {
                     dateOfBirth: dateOfBirth || null,
                     cccd,
                     cccdIssuedPlace,
-                    address,
+                    address: [addrDetail, addrDistrict, addrProvince].filter(Boolean).join(', '),
                     email,
                     phone,
                     school,
@@ -100,6 +104,7 @@ export default function RegisterTutor() {
                     strengths,
                     subjects,
                     grades,
+                    teachingMode,
                 },
             });
 
@@ -225,8 +230,25 @@ export default function RegisterTutor() {
                                 <input value={cccdIssuedPlace} onChange={e => setCccdIssuedPlace(e.target.value)} required placeholder="Cục CS QLHC về TTXH" />
                             </div>
                             <div className="form-group full-width">
-                                <label>Địa chỉ *</label>
-                                <input value={address} onChange={e => setAddress(e.target.value)} required placeholder="Số nhà, đường, phường, quận, tỉnh/thành" />
+                                <label>Tỉnh / Thành phố *</label>
+                                <select value={addrProvince} onChange={e => { setAddrProvince(e.target.value); setAddrDistrict(''); }} required>
+                                    <option value="">-- Chọn tỉnh/thành --</option>
+                                    {VIETNAM_PROVINCES.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                                </select>
+                            </div>
+                            {addrProvince && (
+                                <div className="form-group full-width">
+                                    <label>Quận / Huyện *</label>
+                                    <select value={addrDistrict} onChange={e => setAddrDistrict(e.target.value)} required>
+                                        <option value="">-- Chọn quận/huyện --</option>
+                                        {getDistricts(addrProvince).map(d => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                </div>
+                            )}
+                            <div className="form-group full-width">
+                                <label>Số nhà, đường, phường</label>
+                                <input value={addrDetail} onChange={e => setAddrDetail(e.target.value)}
+                                    placeholder="Ví dụ: 123 Lê Lợi, P. Bến Nghé" />
                             </div>
                         </div>
 
@@ -278,6 +300,25 @@ export default function RegisterTutor() {
                                 <label key={g} className={`checkbox-item ${grades.includes(g) ? 'checked' : ''}`}>
                                     <input type="checkbox" checked={grades.includes(g)} onChange={() => toggle(grades, setGrades, g)} />
                                     {g}
+                                </label>
+                            ))}
+                        </div>
+
+                        {/* HÌNH THỨC DẠY */}
+                        <div className="form-section-title">Hình thức dạy *</div>
+                        <div className="checkbox-grid" style={{ marginBottom: '1.5rem' }}>
+                            {[
+                                { value: 'ONLINE',  label: '🌐 Online (dạy qua mạng)' },
+                                { value: 'OFFLINE', label: '🏠 Offline (dạy tại nhà)' },
+                                { value: 'BOTH',    label: '🌐🏠 Cả hai hình thức' },
+                            ].map(opt => (
+                                <label key={opt.value} className={`checkbox-item ${teachingMode === opt.value ? 'checked' : ''}`}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => setTeachingMode(opt.value)}>
+                                    <input type="radio" name="teachingMode" value={opt.value}
+                                        checked={teachingMode === opt.value}
+                                        onChange={() => setTeachingMode(opt.value)} />
+                                    {opt.label}
                                 </label>
                             ))}
                         </div>

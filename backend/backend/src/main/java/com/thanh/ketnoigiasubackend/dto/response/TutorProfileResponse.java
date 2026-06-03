@@ -36,4 +36,7 @@ public class TutorProfileResponse {
     private List<String> grades;
     private List<CourseResponse> courses;
     private String avatar;
+    private String bio;       // Giới thiệu bản thân
+    private String avatarUrl; // Ảnh đại diện upload
+    private String teachingMode; // ONLINE | OFFLINE | BOTH
 }

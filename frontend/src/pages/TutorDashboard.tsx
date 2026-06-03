@@ -83,7 +83,8 @@ export default function TutorDashboard() {
     const [complaintReason, setComplaintReason] = useState('');
     const [complaintMsg, setComplaintMsg] = useState('');
 
-    // Modal tạo/sửa khóa học
+    // Filter đơn đăng ký
+    const [appFilter, setAppFilter] = useState<'PENDING' | 'DONE'>('PENDING');
     const [courseModal, setCourseModal] = useState<{ open: boolean; editing: Course | null }>({ open: false, editing: null });
     const [courseForm, setCourseForm] = useState({ title: '', description: '', pricePerSession: '', totalSessions: '', subjectId: '1', teachingMode: 'BOTH' });
     const [courseMsg, setCourseMsg] = useState('');
@@ -317,31 +318,62 @@ export default function TutorDashboard() {
                             {tab === 'applications' && (
                                 <div>
                                     <h2 className="dash-title">Đơn đăng ký từ học viên</h2>
-                                    {applications.length === 0 ? (
-                                        <div className="empty-state"><p>Chưa có đơn đăng ký nào.</p></div>
-                                    ) : (
-                                        <div className="card-list">
-                                            {applications.map(app => (
-                                                <div key={app.id} className="reg-card">
-                                                    <div className="reg-card-header">
-                                                        <h3>{app.studentName}</h3>
-                                                        <span className="status-badge" style={{ background: app.status === 'PENDING' ? '#f59e0b' : app.status === 'APPROVED' ? '#10b981' : '#ef4444' }}>
-                                                            {app.status === 'PENDING' ? 'Chờ duyệt' : app.status === 'APPROVED' ? 'Đã duyệt' : 'Từ chối'}
-                                                        </span>
-                                                    </div>
-                                                    <p>📚 Khóa học: <strong>{app.courseTitle}</strong></p>
-                                                    {app.notes && <p>📝 Ghi chú: {app.notes}</p>}
-                                                    <p>📅 {new Date(app.appliedAt).toLocaleDateString('vi-VN')}</p>
-                                                    {app.status === 'PENDING' && (
-                                                        <div className="reg-actions">
-                                                            <button className="btn-sm btn-primary" onClick={() => reviewApplication(app.id, 'APPROVED')}>✅ Duyệt</button>
-                                                            <button className="btn-sm btn-danger" onClick={() => reviewApplication(app.id, 'REJECTED')}>❌ Từ chối</button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
+
+                                    {/* 2 Ô THỐNG KÊ */}
+                                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                                        <div onClick={() => setAppFilter('PENDING')}
+                                            style={{ flex: 1, position: 'relative', background: appFilter === 'PENDING' ? '#fef3c7' : 'white', border: `2px solid ${appFilter === 'PENDING' ? '#f59e0b' : '#e2e8f0'}`, borderRadius: '14px', padding: '1.25rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+                                            <p style={{ margin: 0, fontSize: '0.85rem', color: '#92400e', fontWeight: 600 }}>⏳ Chờ duyệt</p>
+                                            <p style={{ margin: '6px 0 0', fontSize: '2rem', fontWeight: 800, color: '#f59e0b' }}>
+                                                {applications.filter(a => a.status === 'PENDING').length}
+                                            </p>
+                                            {applications.filter(a => a.status === 'PENDING').length > 0 && (
+                                                <span style={{ position: 'absolute', top: 10, right: 10, background: '#ef4444', color: 'white', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                    {applications.filter(a => a.status === 'PENDING').length}
+                                                </span>
+                                            )}
                                         </div>
-                                    )}
+                                        <div onClick={() => setAppFilter('DONE')}
+                                            style={{ flex: 1, background: appFilter === 'DONE' ? '#f0fdf4' : 'white', border: `2px solid ${appFilter === 'DONE' ? '#10b981' : '#e2e8f0'}`, borderRadius: '14px', padding: '1.25rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+                                            <p style={{ margin: 0, fontSize: '0.85rem', color: '#065f46', fontWeight: 600 }}>✅ Đã xử lý</p>
+                                            <p style={{ margin: '6px 0 0', fontSize: '2rem', fontWeight: 800, color: '#10b981' }}>
+                                                {applications.filter(a => a.status !== 'PENDING').length}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* DANH SÁCH */}
+                                    {(() => {
+                                        const list = (appFilter === 'PENDING'
+                                            ? applications.filter(a => a.status === 'PENDING')
+                                            : applications.filter(a => a.status !== 'PENDING')
+                                        ).sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
+                                        return list.length === 0 ? (
+                                            <div className="empty-state"><p>{appFilter === 'PENDING' ? 'Không có đơn nào chờ duyệt.' : 'Chưa có đơn nào được xử lý.'}</p></div>
+                                        ) : (
+                                            <div className="card-list">
+                                                {list.map(app => (
+                                                    <div key={app.id} className="reg-card" style={{ borderLeft: `4px solid ${app.status === 'PENDING' ? '#f59e0b' : app.status === 'APPROVED' || app.status === 'ACTIVE' ? '#10b981' : '#ef4444'}` }}>
+                                                        <div className="reg-card-header">
+                                                            <h3>{app.studentName}</h3>
+                                                            <span className="status-badge" style={{ background: app.status === 'PENDING' ? '#f59e0b' : app.status === 'APPROVED' ? '#10b981' : app.status === 'ACTIVE' ? '#6366f1' : app.status === 'COMPLETED' ? '#64748b' : '#ef4444' }}>
+                                                                {app.status === 'PENDING' ? 'Chờ duyệt' : app.status === 'APPROVED' ? 'Đã duyệt' : app.status === 'ACTIVE' ? 'Đang học' : app.status === 'COMPLETED' ? 'Hoàn thành' : 'Từ chối'}
+                                                            </span>
+                                                        </div>
+                                                        <p>📚 <strong>{app.courseTitle}</strong></p>
+                                                        {app.notes && <p>📝 {app.notes}</p>}
+                                                        <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>📅 {new Date(app.appliedAt).toLocaleDateString('vi-VN')}</p>
+                                                        {app.status === 'PENDING' && (
+                                                            <div className="reg-actions">
+                                                                <button className="btn-sm btn-primary" onClick={() => reviewApplication(app.id, 'APPROVED')}>✅ Duyệt</button>
+                                                                <button className="btn-sm btn-danger" onClick={() => reviewApplication(app.id, 'REJECTED')}>❌ Từ chối</button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
 

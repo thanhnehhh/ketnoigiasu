@@ -20,4 +20,5 @@ public class TutorProfileRequest {
     private String strengths;
     private String subjects;
     private String grades;
+    private String bio; // Giới thiệu bản thân
 }

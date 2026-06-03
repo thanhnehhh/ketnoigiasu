@@ -71,9 +71,18 @@ public class TutorProfileService {
                 .phone(tutor.getUser().getPhone())
                 .school(tutor.getSchool())
                 .major(tutor.getMajor())
+                .graduationYear(tutor.getGraduationYear())
+                .currentOccupation(tutor.getCurrentOccupation())
                 .strengths(tutor.getStrengths())
                 .address(tutor.getAddress())
-                .courses(courses) // Kèm luôn danh sách lớp đang dạy
+                .subjects(tutor.getSubjects() != null ?
+                        java.util.Arrays.asList(tutor.getSubjects().split("\\s*,\\s*")) : java.util.List.of())
+                .grades(tutor.getGrades() != null ?
+                        java.util.Arrays.asList(tutor.getGrades().split("\\s*,\\s*")) : java.util.List.of())
+                .bio(tutor.getBio())
+                .avatarUrl(tutor.getAvatarUrl())
+                .teachingMode(tutor.getTeachingMode())
+                .courses(courses)
                 .build();
     }
 }

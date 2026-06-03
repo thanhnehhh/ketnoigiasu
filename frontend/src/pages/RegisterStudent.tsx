@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import PasswordInput from '../components/PasswordInput';
+import { VIETNAM_PROVINCES, getDistricts } from '../data/vietnamDistricts';
 import '../css/RegisterStudent.css';
 
 /**
@@ -31,7 +32,9 @@ export default function RegisterStudent() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [fullName, setFullName] = useState('');
     const [phone, setPhone] = useState('');
-    const [address, setAddress] = useState('');
+    const [addrProvince, setAddrProvince] = useState('');
+    const [addrDistrict, setAddrDistrict] = useState('');
+    const [addrDetail, setAddrDetail] = useState('');
     const [gradeLevel, setGradeLevel] = useState('');
     const [learningGoals, setLearningGoals] = useState('');
 
@@ -66,7 +69,7 @@ export default function RegisterStudent() {
                 otp,
                 password,
                 confirmPassword,
-                registerData: { fullName, phone, address, gradeLevel, learningGoals },
+                registerData: { fullName, phone, address: [addrDetail, addrDistrict, addrProvince].filter(Boolean).join(', '), gradeLevel, learningGoals },
             });
 
             // BE trả { token, message }
@@ -233,12 +236,27 @@ export default function RegisterStudent() {
                                 </select>
                             </div>
                             <div className="form-group full-width">
-                                <label>Địa chỉ *</label>
+                                <label>Tỉnh / Thành phố *</label>
+                                <select value={addrProvince} onChange={e => { setAddrProvince(e.target.value); setAddrDistrict(''); }} required>
+                                    <option value="">-- Chọn tỉnh/thành --</option>
+                                    {VIETNAM_PROVINCES.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                                </select>
+                            </div>
+                            {addrProvince && (
+                                <div className="form-group full-width">
+                                    <label>Quận / Huyện *</label>
+                                    <select value={addrDistrict} onChange={e => setAddrDistrict(e.target.value)} required>
+                                        <option value="">-- Chọn quận/huyện --</option>
+                                        {getDistricts(addrProvince).map(d => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                </div>
+                            )}
+                            <div className="form-group full-width">
+                                <label>Số nhà, đường, phường</label>
                                 <input
-                                    value={address}
-                                    onChange={e => setAddress(e.target.value)}
-                                    required
-                                    placeholder="Quận 1, TP.HCM"
+                                    value={addrDetail}
+                                    onChange={e => setAddrDetail(e.target.value)}
+                                    placeholder="Ví dụ: 123 Nguyễn Trãi, P. Nguyễn Cư Trinh"
                                 />
                             </div>
                             <div className="form-group full-width">

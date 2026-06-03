@@ -5,10 +5,12 @@ import com.thanh.ketnoigiasubackend.dto.request.TutorProfileRequest;
 import com.thanh.ketnoigiasubackend.entity.StudentProfile;
 import com.thanh.ketnoigiasubackend.entity.TutorProfile;
 import com.thanh.ketnoigiasubackend.service.ProfileService;
+import com.thanh.ketnoigiasubackend.service.MaterialService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -35,5 +37,12 @@ public class ProfileController {
     @PutMapping("/tutor")
     public ResponseEntity<?> updateTutor(@RequestBody TutorProfileRequest request, Authentication auth) {
         return ResponseEntity.ok(profileService.updateTutorProfile(auth.getName(), request));
+    }
+
+    @PostMapping("/tutor/avatar")
+    public ResponseEntity<?> uploadTutorAvatar(
+            @RequestParam("file") MultipartFile file,
+            Authentication auth) {
+        return ResponseEntity.ok(profileService.uploadTutorAvatar(auth.getName(), file));
     }
 }

@@ -83,6 +83,7 @@ public class RegisterService {
                 .strengths(request.getStrengths())
                 .subjects(subjectsStr)
                 .grades(gradesStr)
+                .teachingMode(request.getTeachingMode() != null ? request.getTeachingMode() : "BOTH")
                 .build();
 
         tutorProfileRepository.save(profile);

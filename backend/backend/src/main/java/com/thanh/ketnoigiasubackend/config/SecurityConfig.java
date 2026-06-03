@@ -48,6 +48,9 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
 
                         .requestMatchers("/api/auth/**", "/api/otp/**", "/api/public/**").permitAll()
+                        .requestMatchers("/api/payments/vnpay/verify").permitAll()
+                        .requestMatchers("/api/admin/payment-info/qr").hasRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/admin/payment-info").hasRole("ADMIN")
 
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/tutor/**", "/api/courses/my-courses").hasAnyRole("TUTOR", "ADMIN")
@@ -59,6 +62,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/materials/**").hasRole("TUTOR")
                         .requestMatchers(HttpMethod.GET, "/api/materials/course/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/materials/download/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/profile/tutor/avatar").hasRole("TUTOR")
                         .requestMatchers("/api/messages/**").authenticated() // Chat — cả tutor lẫn student
                         .anyRequest().authenticated()
                 )
