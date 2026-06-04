@@ -3,7 +3,9 @@ package com.thanh.ketnoigiasubackend.service;
 import com.thanh.ketnoigiasubackend.dto.response.NotificationResponse;
 import com.thanh.ketnoigiasubackend.entity.Notification;
 import com.thanh.ketnoigiasubackend.entity.User;
+import com.thanh.ketnoigiasubackend.enums.Role;
 import com.thanh.ketnoigiasubackend.repository.NotificationRepository;
+import com.thanh.ketnoigiasubackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class NotificationService {
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
 
     /** Tạo thông báo không có link */
     @Transactional
@@ -30,6 +33,13 @@ public class NotificationService {
                 .actionUrl(actionUrl)
                 .build();
         notificationRepository.save(notification);
+    }
+
+    /** Gửi thông báo đến tất cả Admin */
+    @Transactional
+    public void notifyAdmins(String message, String actionUrl) {
+        userRepository.findByRole(Role.ADMIN).forEach(admin ->
+                createNotification(admin, message, actionUrl));
     }
 
     public List<NotificationResponse> getMyNotifications(Long userId) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../css/Dashboard.css';
@@ -14,6 +15,8 @@ interface Registration {
     status: string;
     pricePerSession: number;
     appliedAt: string;
+    completedSessions: number;
+    totalSessions: number;
 }
 
 interface Notification {
@@ -69,8 +72,16 @@ const PAYMENT_STATUS: Record<string, { label: string; color: string }> = {
 export default function StudentDashboard() {
     const { user, logout } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
-    const tab = (searchParams.get('tab') as 'courses' | 'payments' | 'notifications') || 'courses';
-    const setTab = (t: 'courses' | 'payments' | 'notifications') => setSearchParams({ tab: t });
+    const [tab, setTabRaw] = useState<'courses' | 'payments' | 'notifications'>((searchParams.get('tab') as any) || 'courses');
+    const setTab = (t: 'courses' | 'payments' | 'notifications') => { setTabRaw(t); setSearchParams({ tab: t }); };
+
+    // Sub-filter trong tab courses
+    const [courseFilter, setCourseFilter] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'APPROVED' | 'COMPLETED' | 'REJECTED'>('ALL');
+    // Sub-filter trong tab payments
+    const [payFilter, setPayFilter] = useState<'ALL' | 'PENDING' | 'PENDING_VERIFY' | 'SUCCESS'>('ALL');
+    // Các filter đã xem — dùng để hiện chấm đỏ "mới"
+    const [seenCourseFilters, setSeenCourseFilters] = useState<Set<string>>(new Set(['ALL']));
+    const [seenPayFilters, setSeenPayFilters]       = useState<Set<string>>(new Set(['ALL']));
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
@@ -139,10 +150,37 @@ export default function StudentDashboard() {
         setNotifications(res.data);
     };
 
+    const handleCourseFilter = (key: typeof courseFilter) => {
+        setCourseFilter(key);
+        setSeenCourseFilters(prev => new Set([...prev, key]));
+    };
+
+    const handlePayFilter = (key: typeof payFilter) => {
+        setPayFilter(key);
+        setSeenPayFilters(prev => new Set([...prev, key]));
+    };
+
     const completeCourse = async (id: number) => {
-        if (!confirm('Xác nhận hoàn thành khóa học này?')) return;
-        await api.put(`/student/registrations/${id}/complete`);
-        fetchAll();
+        toast((t) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span>Xác nhận hoàn thành khóa học này?</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                        style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 600 }}
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            await api.put(`/student/registrations/${id}/complete`);
+                            toast.success('Đã xác nhận hoàn thành khóa học!');
+                            fetchAll();
+                        }}
+                    >Xác nhận</button>
+                    <button
+                        style={{ background: '#e2e8f0', color: '#374151', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer' }}
+                        onClick={() => toast.dismiss(t.id)}
+                    >Hủy</button>
+                </div>
+            </div>
+        ), { duration: 10000 });
     };
 
     const submitProof = async () => {
@@ -224,10 +262,10 @@ export default function StudentDashboard() {
             if (res.data.paymentUrl) {
                 window.location.href = res.data.paymentUrl; // redirect sang VNPay
             } else {
-                alert('❌ Không tạo được link VNPay: ' + (res.data.error || 'Lỗi không xác định'));
+                toast.error('❌ Không tạo được link VNPay: ' + (res.data.error || 'Lỗi không xác định'));
             }
         } catch (e: any) {
-            alert('❌ ' + (e.response?.data?.error || 'Lỗi kết nối'));
+            toast.error(e.response?.data?.error || 'Lỗi kết nối');
         }
     };    const submitRefund = async () => {
         if (!refundReason.trim()) { setRefundMsg('❌ Vui lòng nhập lý do hoàn tiền'); return; }
@@ -272,9 +310,6 @@ export default function StudentDashboard() {
                         <button className={tab === 'payments' ? 'active' : ''} onClick={() => setTab('payments')}>
                             💳 Hóa đơn
                         </button>
-                        <button className={tab === 'notifications' ? 'active' : ''} onClick={() => setTab('notifications')}>
-                            🔔 Thông báo {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-                        </button>
                         <Link to="/courses" className="dash-nav-link">🔍 Tìm khóa học</Link>
                         <Link to="/profile" className="dash-nav-link">👤 Hồ sơ của tôi</Link>
                         <button className="logout-btn" onClick={logout}>🚪 Đăng xuất</button>
@@ -297,45 +332,85 @@ export default function StudentDashboard() {
                                             <Link to="/" className="btn-primary">Tìm khóa học ngay</Link>
                                         </div>
                                     ) : (
-                                        <div className="card-list">
-                                            {registrations.map(reg => {
-                                                const s = STATUS_LABEL[reg.status] || { label: reg.status, color: '#64748b' };
-                                                const canEnter = reg.status === 'ACTIVE' || reg.status === 'COMPLETED';
-                                                return (
-                                                    <div key={reg.id} className={`reg-card ${canEnter ? 'reg-card-clickable' : ''}`}>
-                                                        <div className="reg-card-header">
-                                                            <h3>
-                                                                <Link
-                                                                    to={`/courses/${reg.courseId}`}
-                                                                    className="reg-title-link"
-                                                                    onClick={e => e.stopPropagation()}
-                                                                >
-                                                                    {reg.courseTitle}
-                                                                </Link>
-                                                            </h3>
-                                                            <span className="status-badge" style={{ background: s.color }}>{s.label}</span>
-                                                        </div>
-                                                        <p className="reg-tutor">👨‍🏫 Gia sư: <strong>{reg.tutorName}</strong></p>
-                                                        <p className="reg-price">💰 {reg.pricePerSession?.toLocaleString('vi-VN')}đ / buổi</p>
-                                                        <p className="reg-date">📅 Đăng ký: {new Date(reg.appliedAt).toLocaleDateString('vi-VN')}</p>
-                                                        <div className="reg-actions">
-                                                            {reg.status === 'ACTIVE' && (
-                                                                <>
+                                        <>
+                                            {/* Filter bar theo trạng thái */}
+                                            <div className="course-filter-bar">
+                                                {([
+                                                    { key: 'ALL',       label: 'Tất cả',           color: '#64748b' },
+                                                    { key: 'ACTIVE',    label: '📚 Đang học',       color: '#10b981' },
+                                                    { key: 'PENDING',   label: '⏳ Chờ duyệt',      color: '#f59e0b' },
+                                                    { key: 'APPROVED',  label: '💳 Chờ đóng tiền',  color: '#3b82f6' },
+                                                    { key: 'COMPLETED', label: '🎓 Hoàn thành',     color: '#6366f1' },
+                                                    { key: 'REJECTED',  label: '✖ Từ chối',        color: '#ef4444' },
+                                                ] as const).map(f => {
+                                                    const count = f.key === 'ALL'
+                                                        ? registrations.length
+                                                        : registrations.filter(r => r.status === f.key).length;
+                                                    if (f.key !== 'ALL' && count === 0) return null;
+                                                    const hasNew = f.key !== 'ALL' && count > 0 && !seenCourseFilters.has(f.key);
+                                                    return (
+                                                        <button
+                                                            key={f.key}
+                                                            className={`course-filter-btn ${courseFilter === f.key ? 'active' : ''}`}
+                                                            style={{ '--filter-color': f.color } as any}
+                                                            onClick={() => handleCourseFilter(f.key)}
+                                                        >
+                                                            {hasNew && <span className="filter-dot" />}
+                                                            {f.label}
+                                                            <span className="course-filter-count">{count}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Danh sách đã lọc */}
+                                            <div className="card-list">
+                                                {registrations
+                                                    .filter(r => courseFilter === 'ALL' || r.status === courseFilter)
+                                                    .map(reg => {
+                                                    const s = STATUS_LABEL[reg.status] || { label: reg.status, color: '#64748b' };
+                                                    const canEnter = reg.status === 'ACTIVE' || reg.status === 'COMPLETED';
+                                                    return (
+                                                        <div key={reg.id} className={`reg-card ${canEnter ? 'reg-card-clickable' : ''}`}>
+                                                            <div className="reg-card-header">
+                                                                <h3>
+                                                                    <Link
+                                                                        to={`/courses/${reg.courseId}`}
+                                                                        className="reg-title-link"
+                                                                        onClick={e => e.stopPropagation()}
+                                                                    >
+                                                                        {reg.courseTitle}
+                                                                    </Link>
+                                                                </h3>
+                                                                <span className="status-badge" style={{ background: s.color }}>{s.label}</span>
+                                                            </div>
+                                                            <p className="reg-tutor">👨‍🏫 Gia sư: <strong>{reg.tutorName}</strong></p>
+                                                            <p className="reg-price">💰 {reg.pricePerSession?.toLocaleString('vi-VN')}đ / buổi</p>
+                                                            <p className="reg-date">📅 Đăng ký: {new Date(reg.appliedAt).toLocaleDateString('vi-VN')}</p>
+                                                            <div className="reg-actions">
+                                                                {reg.status === 'ACTIVE' && (
                                                                     <Link to={`/student/course/${reg.courseId}`} className="btn-sm btn-primary">📅 Vào lớp học</Link>
-                                                                    <button className="btn-sm btn-outline" onClick={() => completeCourse(reg.id)}>✅ Hoàn thành</button>
-                                                                </>
-                                                            )}
-                                                            {reg.status === 'COMPLETED' && (
-                                                                <>
-                                                                    <Link to={`/student/course/${reg.courseId}`} className="btn-sm btn-outline">📖 Xem lại lớp học</Link>
-                                                                    <Link to={`/student/review/${reg.id}`} className="btn-sm btn-primary">⭐ Đánh giá</Link>
-                                                                </>
-                                                            )}
+                                                                )}
+                                                                {reg.status === 'COMPLETED' && (
+                                                                    <>
+                                                                        <Link to={`/student/course/${reg.courseId}`} className="btn-sm btn-outline">📖 Xem lại lớp học</Link>
+                                                                        <Link to={`/student/review/${reg.id}`} className="btn-sm btn-primary">⭐ Đánh giá</Link>
+                                                                    </>
+                                                                )}
+                                                                {reg.status === 'APPROVED' && (
+                                                                    <button className="btn-sm btn-primary" onClick={() => setTab('payments')}>
+                                                                        💳 Đóng học phí ngay
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                                    );
+                                                })}
+                                                {registrations.filter(r => courseFilter === 'ALL' || r.status === courseFilter).length === 0 && (
+                                                    <div className="empty-state"><p>Không có khóa học nào trong mục này.</p></div>
+                                                )}
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -347,8 +422,38 @@ export default function StudentDashboard() {
                                     {payments.filter(p => p.paymentType === 'TUITION_FEE').length === 0 ? (
                                         <div className="empty-state"><p>Chưa có hóa đơn nào.</p></div>
                                     ) : (
+                                        <>
+                                        {/* Filter bar hóa đơn */}
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',            label: 'Tất cả',            color: '#64748b' },
+                                                { key: 'PENDING',        label: '⏳ Chờ thanh toán',  color: '#f59e0b' },
+                                                { key: 'PENDING_VERIFY', label: '🔍 Chờ xác nhận',   color: '#3b82f6' },
+                                                { key: 'SUCCESS',        label: '✅ Đã thanh toán',   color: '#10b981' },
+                                            ] as const).map(f => {
+                                                const tuitionPayments = payments.filter(p => p.paymentType === 'TUITION_FEE');
+                                                const count = f.key === 'ALL'
+                                                    ? tuitionPayments.length
+                                                    : tuitionPayments.filter(p => p.status === f.key).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenPayFilters.has(f.key);
+                                                return (
+                                                    <button
+                                                        key={f.key}
+                                                        className={`course-filter-btn ${payFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => handlePayFilter(f.key)}
+                                                    >
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {payments.filter(p => p.paymentType === 'TUITION_FEE').map(pay => {
+                                            {payments.filter(p => p.paymentType === 'TUITION_FEE'
+                                                && (payFilter === 'ALL' || p.status === payFilter)).map(pay => {
                                                 const ps = PAYMENT_STATUS[pay.status] || { label: pay.status, color: '#64748b' };
                                                 const isExpired = pay.expiresAt && new Date(pay.expiresAt) < new Date();
                                                 const hasRefund = refunds.some(r => r.paymentId === pay.id);
@@ -407,6 +512,7 @@ export default function StudentDashboard() {
                                                 );
                                             })}
                                         </div>
+                                        </>
                                     )}
 
                                     {/* Lịch sử yêu cầu hoàn tiền */}
@@ -441,36 +547,8 @@ export default function StudentDashboard() {
                                 </div>
                             )}
 
-                            {/* TAB: THÔNG BÁO */}
-                            {tab === 'notifications' && (
-                                <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                        <h2 className="dash-title" style={{ margin: 0 }}>Thông báo</h2>
-                                        {unreadCount > 0 && (
-                                            <button className="btn-sm btn-outline" onClick={markAllRead}>Đọc tất cả</button>
-                                        )}
-                                    </div>
-                                    {notifications.length === 0 ? (
-                                        <div className="empty-state"><p>Chưa có thông báo nào.</p></div>
-                                    ) : (
-                                        <div className="noti-list">
-                                            {notifications.map(n => (
-                                                <div
-                                                    key={n.id}
-                                                    className={`noti-item ${!n.isRead ? 'unread' : ''}`}
-                                                    onClick={() => !n.isRead && markRead(n.id)}
-                                                >
-                                                    <div className="noti-dot" style={{ background: n.isRead ? '#e2e8f0' : '#4f46e5' }} />
-                                                    <div className="noti-content">
-                                                        <p>{n.message}</p>
-                                                        <span>{new Date(n.createdAt).toLocaleString('vi-VN')}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                            {/* TAB: THÔNG BÁO — đã chuyển lên Header */}
+                            {tab === 'notifications' && null}
                         </>
                     )}
                 </main>
@@ -566,7 +644,7 @@ export default function StudentDashboard() {
                                     {transferContent}
                                 </code>
                                 <button
-                                    onClick={() => { navigator.clipboard.writeText(transferContent); alert('✅ Đã copy nội dung!'); }}
+                                    onClick={() => { navigator.clipboard.writeText(transferContent); toast.success('Đã copy nội dung chuyển khoản!'); }}
                                     style={{ background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                                     📋 Copy
                                 </button>

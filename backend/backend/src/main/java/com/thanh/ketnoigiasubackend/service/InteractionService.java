@@ -15,6 +15,7 @@ public class InteractionService {
     private final CourseRegistrationRepository registrationRepository;
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public void sendReport(String email, ReportRequest request) {
@@ -28,6 +29,12 @@ public class InteractionService {
                 .content(request.getContent())
                 .build();
         reportRepository.save(report);
+
+        notificationService.notifyAdmins(
+                "🚨 Học viên " + reg.getStudent().getUser().getFullName() +
+                " tố cáo gia sư " + reg.getCourse().getTutor().getUser().getFullName() +
+                ": " + request.getTitle(),
+                "/admin?tab=reports");
     }
 
     @Transactional
@@ -41,5 +48,10 @@ public class InteractionService {
                 .reason(request.getReason())
                 .build();
         complaintRepository.save(complaint);
+
+        notificationService.notifyAdmins(
+                "📣 Gia sư " + review.getTutor().getUser().getFullName() +
+                " khiếu nại đánh giá #" + review.getId() + ".",
+                "/admin?tab=complaints");
     }
 }

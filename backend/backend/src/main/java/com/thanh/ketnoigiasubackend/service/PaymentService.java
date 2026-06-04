@@ -21,6 +21,7 @@ public class PaymentService {
     private final CourseRegistrationRepository registrationRepository;
     private final NotificationService notificationService;
     private final TutorProfileRepository tutorProfileRepository;
+    private final SessionService sessionService;
 
     @Transactional
     public PaymentResponse createPlatformFeeRequest(String email, String proofUrl) {
@@ -35,6 +36,9 @@ public class PaymentService {
         Payment saved = paymentRepository.save(payment);
         notificationService.createNotification(user,
                 "💵 Yêu cầu phí sàn đã gửi. Vui lòng đợi Admin duyệt.", "/tutor");
+        notificationService.notifyAdmins(
+                "💵 Gia sư " + user.getFullName() + " vừa nộp phí sàn. Cần duyệt minh chứng.",
+                "/admin?tab=payments");
         return mapToResponse(saved);
     }
 
@@ -53,6 +57,9 @@ public class PaymentService {
         notificationService.createNotification(user,
                 "🔥 Yêu cầu đẩy tin cho '" + course.getTitle() + "' đã tạo. Nộp minh chứng 50.000đ (Mã HĐ: #" + saved.getId() + ").",
                 "/tutor");
+        notificationService.notifyAdmins(
+                "🔥 Gia sư " + user.getFullName() + " yêu cầu đẩy tin khóa '" + course.getTitle() + "'.",
+                "/admin?tab=payments");
         return mapToResponse(saved);
     }
 
@@ -64,13 +71,19 @@ public class PaymentService {
     public PaymentResponse approvePayment(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId).orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch"));
         if (payment.getStatus() == PaymentStatus.SUCCESS) throw new RuntimeException("Giao dịch này đã được duyệt rồi");
+        // Check hết hạn với TUITION_FEE
+        if ("TUITION_FEE".equals(payment.getPaymentType())
+                && payment.getExpiresAt() != null
+                && LocalDateTime.now().isAfter(payment.getExpiresAt())) {
+            throw new RuntimeException("Hóa đơn này đã hết hạn, không thể duyệt.");
+        }
 
         payment.setStatus(PaymentStatus.SUCCESS);
         payment.setVerifiedAt(LocalDateTime.now());
 
         if ("PLATFORM_FEE".equals(payment.getPaymentType())) {
             notificationService.createNotification(payment.getUser(),
-                    "✅ Phí sàn đã được duyệt! Bạn có thể tạo khóa học ngay.", "/tutor");
+                    "✅ Phí sàn đã được duyệt! Bạn có thể tạo khóa học ngay.", "/tutor?tab=courses");
 
         } else if ("PROMOTE".equals(payment.getPaymentType()) && payment.getCourse() != null) {
             Course course = payment.getCourse();
@@ -78,12 +91,13 @@ public class PaymentService {
             course.setPromotionExpiration(LocalDateTime.now().plusDays(7));
             courseRepository.save(course);
             notificationService.createNotification(payment.getUser(),
-                    "🔥 Khóa học '" + course.getTitle() + "' đã được đẩy tin trong 7 ngày!", "/tutor");
+                    "🔥 Khóa học '" + course.getTitle() + "' đã được đẩy tin trong 7 ngày!", "/tutor?tab=courses");
 
         } else if ("TUITION_FEE".equals(payment.getPaymentType()) && payment.getRegistration() != null) {
             CourseRegistration reg = payment.getRegistration();
             reg.setStatus("ACTIVE");
             registrationRepository.save(reg);
+            sessionService.initializeSessions(reg.getCourse()); // đảm bảo buổi học tồn tại
             // Thông báo học viên → link đến lớp học
             notificationService.createNotification(payment.getUser(),
                     "✅ Học phí đã xác nhận! Lớp '" + reg.getCourse().getTitle() + "' đã bắt đầu. Chúc bạn học tốt!",
@@ -109,7 +123,14 @@ public class PaymentService {
             throw new RuntimeException("Bạn không có quyền cập nhật hóa đơn này!");
         payment.setProofImageUrl(proofImageUrl);
         payment.setStatus(PaymentStatus.PENDING_VERIFY);
-        return mapToResponse(paymentRepository.save(payment));
+        Payment saved = paymentRepository.save(payment);
+        // Thông báo Admin có minh chứng mới cần duyệt
+        String label = "TUITION_FEE".equals(payment.getPaymentType()) ? "học phí"
+                     : "PLATFORM_FEE".equals(payment.getPaymentType()) ? "phí sàn" : "đẩy tin";
+        notificationService.notifyAdmins(
+                "🖼️ " + payment.getUser().getFullName() + " vừa nộp minh chứng " + label + ". Cần xác nhận.",
+                "/admin?tab=payments");
+        return mapToResponse(saved);
     }
 
     public List<PaymentResponse> getMyPayments(String email) {
@@ -314,16 +335,17 @@ public class PaymentService {
         if (payment.getRegistration() != null) {
             payment.getRegistration().setStatus("ACTIVE");
             registrationRepository.save(payment.getRegistration());
+            sessionService.initializeSessions(payment.getRegistration().getCourse());
             notificationService.createNotification(payment.getUser(),
                     "✅ Thanh toán ZaloPay thành công! Lớp học '" +
                     payment.getRegistration().getCourse().getTitle() + "' đã được kích hoạt.",
-                    "/student");
+                    "/student/course/" + payment.getRegistration().getCourse().getId());
             notificationService.createNotification(
                     payment.getRegistration().getCourse().getTutor().getUser(),
                     "💰 Học viên " + payment.getUser().getFullName() +
                     " đã thanh toán học phí qua ZaloPay cho lớp '" +
                     payment.getRegistration().getCourse().getTitle() + "'.",
-                    "/tutor");
+                    "/tutor/course/" + payment.getRegistration().getCourse().getId());
         }
     }
 
@@ -341,16 +363,17 @@ public class PaymentService {
         if (payment.getRegistration() != null) {
             payment.getRegistration().setStatus("ACTIVE");
             registrationRepository.save(payment.getRegistration());
+            sessionService.initializeSessions(payment.getRegistration().getCourse());
             notificationService.createNotification(payment.getUser(),
                     "✅ Thanh toán VNPay thành công! Lớp học '" +
                     payment.getRegistration().getCourse().getTitle() + "' đã được kích hoạt.",
-                    "/student");
+                    "/student/course/" + payment.getRegistration().getCourse().getId());
             notificationService.createNotification(
                     payment.getRegistration().getCourse().getTutor().getUser(),
                     "💰 Học viên " + payment.getUser().getFullName() +
                     " đã thanh toán học phí qua VNPay cho lớp '" +
                     payment.getRegistration().getCourse().getTitle() + "'.",
-                    "/tutor");
+                    "/tutor/course/" + payment.getRegistration().getCourse().getId());
         }
     }
 }

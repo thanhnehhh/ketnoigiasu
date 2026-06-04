@@ -227,11 +227,12 @@ export default function RegisterStudent() {
                                         <option value="Lớp 11">Lớp 11</option>
                                         <option value="Lớp 12">Lớp 12</option>
                                     </optgroup>
-                                    <optgroup label="Khác">
-                                        <option value="Tiếng Anh giao tiếp">Tiếng Anh giao tiếp</option>
+                                    <optgroup label="Ngoại ngữ">
+                                        <option value="Tiếng Anh">Tiếng Anh</option>
                                         <option value="Tiếng Trung">Tiếng Trung</option>
                                         <option value="Tiếng Nhật">Tiếng Nhật</option>
-                                        <option value="IELTS/TOEIC">IELTS / TOEIC</option>
+                                        <option value="IELTS">IELTS</option>
+                                        <option value="TOEIC">TOEIC</option>
                                     </optgroup>
                                 </select>
                             </div>

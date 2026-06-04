@@ -16,6 +16,7 @@ public class ComplaintService {
 
     private final ComplaintRepository complaintRepository;
     private final ReviewRepository reviewRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public ComplaintResponse submitComplaint(String tutorEmail, ComplaintRequest request) {
@@ -34,6 +35,11 @@ public class ComplaintService {
                 .build();
 
         Complaint saved = complaintRepository.save(complaint);
+
+        notificationService.notifyAdmins(
+                "📣 Gia sư " + review.getTutor().getUser().getFullName() +
+                " khiếu nại đánh giá #" + review.getId() + ". Cần xem xét.",
+                "/admin?tab=complaints");
 
         return ComplaintResponse.builder()
                 .id(saved.getId())

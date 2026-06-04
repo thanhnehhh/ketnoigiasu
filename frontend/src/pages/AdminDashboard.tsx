@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import api, { toFullUrl } from '../services/api';
+import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../css/Dashboard.css';
@@ -99,6 +100,20 @@ export default function AdminDashboard() {
     const [vietQRFile, setVietQRFile] = useState<File | null>(null);
     const [vietQRMsg, setVietQRMsg] = useState('');
     const [vietQRPreview, setVietQRPreview] = useState<string>('');
+
+    // Filter states
+    const [courseFilter, setCourseFilter]       = useState<'ALL'|'PENDING_APPROVE'|'APPROVED'|'REJECTED'|'HIDDEN'>('ALL');
+    const [payFilter, setPayFilter]             = useState<'ALL'|'PLATFORM_FEE'|'PROMOTE'|'TUITION_FEE'>('ALL');
+    const [contractFilter, setContractFilter]   = useState<'ALL'|'PENDING'|'SIGNED'>('ALL');
+    const [reportFilter, setReportFilter]       = useState<'ALL'|'PENDING'|'RESOLVED'>('ALL');
+    const [complaintFilter, setComplaintFilter] = useState<'ALL'|'PENDING'|'ACCEPTED'|'REJECTED'>('ALL');
+    const [financeSection, setFinanceSection]   = useState<'transfer'|'history'|'refund'>('transfer');
+
+    const [seenCourseF,    setSeenCourseF]    = useState(new Set(['ALL']));
+    const [seenPayF,       setSeenPayF]       = useState(new Set(['ALL']));
+    const [seenContractF,  setSeenContractF]  = useState(new Set(['ALL']));
+    const [seenReportF,    setSeenReportF]    = useState(new Set(['ALL']));
+    const [seenComplaintF, setSeenComplaintF] = useState(new Set(['ALL']));
 
     useEffect(() => {
         fetchAll();
@@ -248,9 +263,26 @@ export default function AdminDashboard() {
         }
     };
     const deleteContract = async (id: number) => {
-        if (!confirm('Xóa hợp đồng này?')) return;
-        await api.delete(`/admin/contracts/${id}`);
-        flash('✅ Đã xóa hợp đồng'); fetchAll();
+        toast((t) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span>Xóa hợp đồng này?</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                        style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 600 }}
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            await api.delete(`/admin/contracts/${id}`);
+                            toast.success('Đã xóa hợp đồng');
+                            fetchAll();
+                        }}
+                    >Xóa</button>
+                    <button
+                        style={{ background: '#e2e8f0', color: '#374151', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer' }}
+                        onClick={() => toast.dismiss(t.id)}
+                    >Hủy</button>
+                </div>
+            </div>
+        ), { duration: 10000 });
     };
 
     // Training log + cancel
@@ -538,8 +570,32 @@ export default function AdminDashboard() {
                                 <div>
                                     <h2 className="dash-title">Quản lý khóa học</h2>
                                     {courses.length === 0 ? <div className="empty-state"><p>Chưa có khóa học nào.</p></div> : (
+                                        <>
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',             label: 'Tất cả',        color: '#64748b' },
+                                                { key: 'PENDING_APPROVE', label: '⏳ Chờ duyệt',  color: '#f59e0b' },
+                                                { key: 'APPROVED',        label: '✅ Đã duyệt',   color: '#10b981' },
+                                                { key: 'REJECTED',        label: '✖ Từ chối',     color: '#ef4444' },
+                                                { key: 'HIDDEN',          label: '🙈 Đã ẩn',      color: '#94a3b8' },
+                                            ] as const).map(f => {
+                                                const count = f.key === 'ALL' ? courses.length : courses.filter(c => c.status === f.key).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenCourseF.has(f.key);
+                                                return (
+                                                    <button key={f.key}
+                                                        className={`course-filter-btn ${courseFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => { setCourseFilter(f.key); setSeenCourseF(p => new Set([...p, f.key])); }}>
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {courses.map(c => (
+                                            {courses.filter(c => courseFilter === 'ALL' || c.status === courseFilter).map(c => (
                                                 <div key={c.id} className="reg-card">
                                                     <div className="reg-card-header">
                                                         <h3>{c.title}</h3>
@@ -563,6 +619,7 @@ export default function AdminDashboard() {
                                                 </div>
                                             ))}
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -574,8 +631,31 @@ export default function AdminDashboard() {
                                     {payments.length === 0 ? (
                                         <div className="empty-state"><p>Không có thanh toán nào đang chờ duyệt.</p></div>
                                     ) : (
+                                        <>
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',          label: 'Tất cả',      color: '#64748b' },
+                                                { key: 'TUITION_FEE',  label: '🎓 Học phí',  color: '#6366f1' },
+                                                { key: 'PLATFORM_FEE', label: '💵 Phí sàn',  color: '#3b82f6' },
+                                                { key: 'PROMOTE',      label: '🔥 Đẩy tin',  color: '#f59e0b' },
+                                            ] as const).map(f => {
+                                                const count = f.key === 'ALL' ? payments.length : payments.filter(p => p.paymentType === f.key).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenPayF.has(f.key);
+                                                return (
+                                                    <button key={f.key}
+                                                        className={`course-filter-btn ${payFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => { setPayFilter(f.key); setSeenPayF(p => new Set([...p, f.key])); }}>
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {payments.map(p => (
+                                            {payments.filter(p => payFilter === 'ALL' || p.paymentType === payFilter).map(p => (
                                                 <div key={p.id} className="reg-card">
                                                     <div className="reg-card-header">
                                                         <h3>{p.paymentType === 'PLATFORM_FEE' ? '💵 Phí sàn' : p.paymentType === 'PROMOTE' ? '🔥 Đẩy tin' : '🎓 Học phí'}</h3>
@@ -594,6 +674,7 @@ export default function AdminDashboard() {
                                                 </div>
                                             ))}
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -681,56 +762,73 @@ export default function AdminDashboard() {
                                         </button>
                                     </div>
 
-                                    {/* Chuyển tiền học phí cho gia sư */}
-                                    <div id="section-transfer" style={{ marginBottom: '1rem', marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                                            💸 Chuyển tiền học phí cho gia sư
-                                        </h3>
-                                        {pendingTransfers.length > 0 && (
-                                            <span className="status-badge" style={{ background: '#3b82f6' }}>{pendingTransfers.length} chưa chuyển</span>
-                                        )}
+                                    {/* Sub-tab finance */}
+                                    <div className="course-filter-bar" style={{ marginBottom: '1.5rem' }}>
+                                        {([
+                                            { key: 'transfer', label: '💸 Chuyển tiền cho gia sư', color: '#3b82f6',
+                                              count: pendingTransfers.length, dot: pendingTransfers.length > 0 },
+                                            { key: 'history',  label: '📋 Lịch sử đã chuyển',     color: '#10b981',
+                                              count: transferHistory.length, dot: false },
+                                            { key: 'refund',   label: '🔄 Hoàn tiền chờ xử lý',   color: '#f59e0b',
+                                              count: refunds.length, dot: refunds.length > 0 },
+                                        ] as const).map(f => (
+                                            <button key={f.key}
+                                                className={`course-filter-btn ${financeSection === f.key ? 'active' : ''}`}
+                                                style={{ '--filter-color': f.color } as any}
+                                                onClick={() => setFinanceSection(f.key)}>
+                                                {f.dot && financeSection !== f.key && <span className="filter-dot" />}
+                                                {f.label}
+                                                <span className="course-filter-count">{f.count}</span>
+                                            </button>
+                                        ))}
                                     </div>
-                                    {pendingTransfers.length === 0 ? (
-                                        <div className="empty-state" style={{ marginBottom: '2rem' }}><p>Tất cả học phí đã được chuyển cho gia sư.</p></div>
-                                    ) : (
-                                        <div className="card-list" style={{ marginBottom: '2rem' }}>
-                                            {pendingTransfers.map(p => {
-                                                const net = p.amount * 0.9;
-                                                const fee = p.amount * 0.1;
-                                                return (
-                                                    <div key={p.id} className="reg-card">
-                                                        <div className="reg-card-header">
-                                                            <h3>🎓 {p.courseTitle || 'Học phí'}</h3>
-                                                            <span className="status-badge" style={{ background: '#3b82f6' }}>Chưa chuyển</span>
-                                                        </div>
-                                                        <p>👤 Học viên: <strong>{p.userFullName}</strong></p>
-                                                        <p>💰 Học phí: <strong>{p.amount?.toLocaleString('vi-VN')}đ</strong></p>
-                                                        <p>📉 Khấu trừ phí sàn (10%): <strong style={{ color: '#f59e0b' }}>-{fee.toLocaleString('vi-VN')}đ</strong></p>
-                                                        <p>🏆 Thực chuyển cho gia sư: <strong style={{ color: '#10b981' }}>{net.toLocaleString('vi-VN')}đ</strong></p>
-                                                        {p.tutorBankAccount ? (
-                                                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 12px', margin: '8px 0', fontSize: '0.85rem' }}>
-                                                                🏦 {p.tutorBankName} — <strong>{p.tutorBankAccount}</strong> ({p.tutorBankOwner})
+
+                                    {/* SECTION: Chuyển tiền cho gia sư */}
+                                    {financeSection === 'transfer' && (
+                                        <>
+                                        {pendingTransfers.length === 0 ? (
+                                            <div className="empty-state"><p>Tất cả học phí đã được chuyển cho gia sư.</p></div>
+                                        ) : (
+                                            <div className="card-list">
+                                                {pendingTransfers.map(p => {
+                                                    const net = p.amount * 0.9;
+                                                    const fee = p.amount * 0.1;
+                                                    return (
+                                                        <div key={p.id} className="reg-card">
+                                                            <div className="reg-card-header">
+                                                                <h3>🎓 {p.courseTitle || 'Học phí'}</h3>
+                                                                <span className="status-badge" style={{ background: '#3b82f6' }}>Chưa chuyển</span>
                                                             </div>
-                                                        ) : (
-                                                            <p style={{ color: '#f59e0b', fontSize: '0.85rem' }}>⚠️ Gia sư chưa cập nhật tài khoản ngân hàng</p>
-                                                        )}
-                                                        <div className="reg-actions">
-                                                            <button className="btn-sm btn-primary" onClick={() => { setTransferModal({ open: true, payment: p }); setTransferProof(null); }}>
-                                                                💸 Chuyển tiền & Upload minh chứng
-                                                            </button>
+                                                            <p>👤 Học viên: <strong>{p.userFullName}</strong></p>
+                                                            <p>💰 Học phí: <strong>{p.amount?.toLocaleString('vi-VN')}đ</strong></p>
+                                                            <p>📉 Khấu trừ phí sàn (10%): <strong style={{ color: '#f59e0b' }}>-{fee.toLocaleString('vi-VN')}đ</strong></p>
+                                                            <p>🏆 Thực chuyển cho gia sư: <strong style={{ color: '#10b981' }}>{net.toLocaleString('vi-VN')}đ</strong></p>
+                                                            {p.tutorBankAccount ? (
+                                                                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 12px', margin: '8px 0', fontSize: '0.85rem' }}>
+                                                                    🏦 {p.tutorBankName} — <strong>{p.tutorBankAccount}</strong> ({p.tutorBankOwner})
+                                                                </div>
+                                                            ) : (
+                                                                <p style={{ color: '#f59e0b', fontSize: '0.85rem' }}>⚠️ Gia sư chưa cập nhật tài khoản ngân hàng</p>
+                                                            )}
+                                                            <div className="reg-actions">
+                                                                <button className="btn-sm btn-primary" onClick={() => { setTransferModal({ open: true, payment: p }); setTransferProof(null); }}>
+                                                                    💸 Chuyển tiền & Upload minh chứng
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        </>
                                     )}
 
-                                    {/* Lịch sử đã chuyển tiền */}
-                                    {transferHistory.length > 0 && (
-                                        <div style={{ marginBottom: '2rem' }}>
-                                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1f2937', margin: '0 0 1rem' }}>
-                                                📋 Lịch sử đã chuyển tiền ({transferHistory.length})
-                                            </h3>
+                                    {/* SECTION: Lịch sử đã chuyển tiền */}
+                                    {financeSection === 'history' && (
+                                        <>
+                                        {transferHistory.length === 0 ? (
+                                            <div className="empty-state"><p>Chưa có lịch sử chuyển tiền nào.</p></div>
+                                        ) : (
                                             <div className="card-list">
                                                 {transferHistory.map(p => (
                                                     <div key={p.id} className="reg-card">
@@ -756,43 +854,41 @@ export default function AdminDashboard() {
                                                     </div>
                                                 ))}
                                             </div>
-                                        </div>
+                                        )}
+                                        </>
                                     )}
 
-                                    {/* Phê duyệt hoàn tiền */}
-                                    <div style={{ marginBottom: '1rem', marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                                            🔄 Yêu cầu hoàn tiền đang chờ
-                                        </h3>
-                                        {refunds.length > 0 && (
-                                            <span className="status-badge" style={{ background: '#f59e0b' }}>{refunds.length} chờ xử lý</span>
+                                    {/* SECTION: Hoàn tiền */}
+                                    {financeSection === 'refund' && (
+                                        <>
+                                        {refunds.length === 0 ? (
+                                            <div className="empty-state"><p>Không có yêu cầu hoàn tiền nào đang chờ.</p></div>
+                                        ) : (
+                                            <div className="card-list">
+                                                {refunds.map(r => (
+                                                    <div key={r.id} className="reg-card">
+                                                        <div className="reg-card-header">
+                                                            <h3>🔄 Hoàn tiền #{r.id} — {r.courseTitle}</h3>
+                                                            <span className="status-badge" style={{ background: '#f59e0b' }}>⏳ Chờ xử lý</span>
+                                                        </div>
+                                                        <p>👤 Học viên: <strong>{r.studentName}</strong></p>
+                                                        <p>💰 Số tiền: <strong>{r.amount?.toLocaleString('vi-VN')}đ</strong></p>
+                                                        <p>📝 Lý do: {r.reason}</p>
+                                                        {r.evidenceUrl && (
+                                                            <p>🖼️ Minh chứng: <a href={toFullUrl(r.evidenceUrl)} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
+                                                        )}
+                                                        <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>📅 {new Date(r.createdAt).toLocaleString('vi-VN')}</p>
+                                                        <div className="reg-actions">
+                                                            <button className="btn-sm btn-primary"
+                                                                onClick={() => { setRefundModal({ open: true, refund: r }); setRefundNote(''); }}>
+                                                                ⚖️ Xử lý yêu cầu
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
-                                    </div>
-                                    {refunds.length === 0 ? (
-                                        <div className="empty-state"><p>Không có yêu cầu hoàn tiền nào đang chờ.</p></div>                                    ) : (
-                                        <div className="card-list">
-                                            {refunds.map(r => (
-                                                <div key={r.id} className="reg-card">
-                                                    <div className="reg-card-header">
-                                                        <h3>🔄 Hoàn tiền #{r.id} — {r.courseTitle}</h3>
-                                                        <span className="status-badge" style={{ background: '#f59e0b' }}>⏳ Chờ xử lý</span>
-                                                    </div>
-                                                    <p>👤 Học viên: <strong>{r.studentName}</strong></p>
-                                                    <p>💰 Số tiền: <strong>{r.amount?.toLocaleString('vi-VN')}đ</strong></p>
-                                                    <p>📝 Lý do: {r.reason}</p>
-                                                    {r.evidenceUrl && (
-                                                        <p>🖼️ Minh chứng: <a href={toFullUrl(r.evidenceUrl)} target="_blank" rel="noreferrer" style={{ color: '#4f46e5' }}>Xem minh chứng</a></p>
-                                                    )}
-                                                    <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>📅 {new Date(r.createdAt).toLocaleString('vi-VN')}</p>
-                                                    <div className="reg-actions">
-                                                        <button className="btn-sm btn-primary"
-                                                            onClick={() => { setRefundModal({ open: true, refund: r }); setRefundNote(''); }}>
-                                                            ⚖️ Xử lý yêu cầu
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -808,8 +904,30 @@ export default function AdminDashboard() {
                                     {contracts.length === 0 ? (
                                         <div className="empty-state"><p>Chưa có hợp đồng nào.</p></div>
                                     ) : (
+                                        <>
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',     label: 'Tất cả',      color: '#64748b' },
+                                                { key: 'PENDING', label: '⏳ Chờ ký',   color: '#f59e0b' },
+                                                { key: 'SIGNED',  label: '✅ Đã ký',    color: '#10b981' },
+                                            ] as const).map(f => {
+                                                const count = f.key === 'ALL' ? contracts.length : contracts.filter(c => c.status === f.key).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenContractF.has(f.key);
+                                                return (
+                                                    <button key={f.key}
+                                                        className={`course-filter-btn ${contractFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => { setContractFilter(f.key); setSeenContractF(p => new Set([...p, f.key])); }}>
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {contracts.map(c => (
+                                            {contracts.filter(c => contractFilter === 'ALL' || c.status === contractFilter).map(c => (
                                                 <div key={c.id} className="reg-card">
                                                     <div className="reg-card-header">
                                                         <h3>📄 Hợp đồng #{c.id} — {c.tutorName}</h3>
@@ -826,6 +944,7 @@ export default function AdminDashboard() {
                                                 </div>
                                             ))}
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -837,28 +956,44 @@ export default function AdminDashboard() {
                                     {reports.length === 0 ? (
                                         <div className="empty-state"><p>Không có báo cáo nào.</p></div>
                                     ) : (
+                                        <>
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',      label: 'Tất cả',        color: '#64748b' },
+                                                { key: 'PENDING',  label: '🚨 Chờ xử lý',  color: '#ef4444' },
+                                                { key: 'RESOLVED', label: '✅ Đã xử lý',   color: '#10b981' },
+                                            ] as const).map(f => {
+                                                const count = f.key === 'ALL' ? reports.length : reports.filter(r => r.status === f.key).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenReportF.has(f.key);
+                                                return (
+                                                    <button key={f.key}
+                                                        className={`course-filter-btn ${reportFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => { setReportFilter(f.key); setSeenReportF(p => new Set([...p, f.key])); }}>
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {reports.map(r => (
+                                            {reports.filter(r => reportFilter === 'ALL' || r.status === reportFilter).map(r => (
                                                 <div key={r.id} className="reg-card">
                                                     <div className="reg-card-header">
                                                         <h3>{r.title}</h3>
-                                                        <span className="status-badge" style={{ background: r.status === 'PENDING' ? '#f59e0b' : '#10b981' }}>
-                                                            {r.status === 'PENDING' ? 'Chờ xử lý' : 'Đã xử lý'}
+                                                        <span className="status-badge" style={{ background: r.status === 'PENDING' ? '#ef4444' : '#10b981' }}>
+                                                            {r.status === 'PENDING' ? '🚨 Chờ xử lý' : '✅ Đã xử lý'}
                                                         </span>
                                                     </div>
                                                     <p>👤 <strong>{r.studentName}</strong> tố cáo gia sư <strong>{r.tutorName}</strong></p>
                                                     <p style={{ color: '#64748b', fontSize: '0.9rem' }}>{r.content}</p>
                                                     <p>📅 {new Date(r.createdAt).toLocaleDateString('vi-VN')}</p>
                                                     <div className="reg-actions">
-                                                        {/* Xem nhật ký lớp học liên quan */}
-                                                        <button className="btn-sm btn-outline" onClick={() => viewLog(r.registrationId)}>
-                                                            📋 Xem nhật ký lớp
-                                                        </button>
-                                                        {/* Hủy lớp học */}
+                                                        <button className="btn-sm btn-outline" onClick={() => viewLog(r.registrationId)}>📋 Xem nhật ký lớp</button>
                                                         <button className="btn-sm btn-outline" onClick={() => cancelRegistration(r.registrationId)}
-                                                            style={{ color: '#f59e0b', borderColor: '#f59e0b' }}>
-                                                            🚫 Hủy lớp học
-                                                        </button>
+                                                            style={{ color: '#f59e0b', borderColor: '#f59e0b' }}>🚫 Hủy lớp học</button>
                                                         {r.status === 'PENDING' && (
                                                             <button className="btn-sm btn-danger" onClick={() => resolveReport(r.id)}>⚖️ Xử lý vi phạm</button>
                                                         )}
@@ -866,6 +1001,7 @@ export default function AdminDashboard() {
                                                 </div>
                                             ))}
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -877,13 +1013,36 @@ export default function AdminDashboard() {
                                     {complaints.length === 0 ? (
                                         <div className="empty-state"><p>Không có khiếu nại nào.</p></div>
                                     ) : (
+                                        <>
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',      label: 'Tất cả',        color: '#64748b' },
+                                                { key: 'PENDING',  label: '📣 Chờ xử lý',  color: '#f59e0b' },
+                                                { key: 'ACCEPTED', label: '✅ Đã chấp nhận', color: '#10b981' },
+                                                { key: 'REJECTED', label: '✖ Đã từ chối',  color: '#ef4444' },
+                                            ] as const).map(f => {
+                                                const count = f.key === 'ALL' ? complaints.length : complaints.filter(c => c.status === f.key).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenComplaintF.has(f.key);
+                                                return (
+                                                    <button key={f.key}
+                                                        className={`course-filter-btn ${complaintFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => { setComplaintFilter(f.key); setSeenComplaintF(p => new Set([...p, f.key])); }}>
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {complaints.map(c => (
+                                            {complaints.filter(c => complaintFilter === 'ALL' || c.status === complaintFilter).map(c => (
                                                 <div key={c.id} className="reg-card">
                                                     <div className="reg-card-header">
                                                         <h3>Khiếu nại review #{c.reviewId}</h3>
-                                                        <span className="status-badge" style={{ background: c.status === 'PENDING' ? '#f59e0b' : '#10b981' }}>
-                                                            {c.status === 'PENDING' ? 'Chờ xử lý' : c.status}
+                                                        <span className="status-badge" style={{ background: c.status === 'PENDING' ? '#f59e0b' : c.status === 'ACCEPTED' ? '#10b981' : '#ef4444' }}>
+                                                            {c.status === 'PENDING' ? '⏳ Chờ xử lý' : c.status === 'ACCEPTED' ? '✅ Chấp nhận' : '✖ Từ chối'}
                                                         </span>
                                                     </div>
                                                     <p>👨‍🏫 Gia sư: <strong>{c.tutorName}</strong></p>
@@ -898,6 +1057,7 @@ export default function AdminDashboard() {
                                                 </div>
                                             ))}
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}

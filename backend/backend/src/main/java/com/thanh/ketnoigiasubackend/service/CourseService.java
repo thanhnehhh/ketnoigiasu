@@ -4,6 +4,7 @@ import com.thanh.ketnoigiasubackend.dto.request.CourseRequest;
 import com.thanh.ketnoigiasubackend.dto.response.CourseResponse;
 import com.thanh.ketnoigiasubackend.entity.*;
 import com.thanh.ketnoigiasubackend.enums.CourseStatus;
+import com.thanh.ketnoigiasubackend.enums.PaymentStatus;
 import com.thanh.ketnoigiasubackend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
@@ -28,6 +29,7 @@ public class CourseService {
     private final NotificationService notificationService;
     private final ReviewRepository reviewRepository;
     private final CourseRegistrationRepository registrationRepository;
+    private final PaymentRepository paymentRepository;
 
     @Transactional
     public CourseResponse createCourse(String email, CourseRequest request) {
@@ -62,7 +64,10 @@ public class CourseService {
         Course savedCourse = courseRepository.save(course);
         notificationService.createNotification(user,
                 "Khóa học '" + savedCourse.getTitle() + "' đã tạo, đang chờ Admin duyệt.",
-                "/tutor");
+                "/tutor?tab=courses");
+        notificationService.notifyAdmins(
+                "📚 Gia sư " + user.getFullName() + " vừa tạo khóa học mới '" + savedCourse.getTitle() + "'. Cần duyệt.",
+                "/admin?tab=courses");
         return mapToResponse(savedCourse);
     }
 
@@ -102,6 +107,7 @@ public class CourseService {
                 .stream().map(this::mapToResponse).toList();
 
         return results.stream()
+                .filter(c -> !c.isHasApprovedStudent()) // ẩn khóa đang có học viên ACTIVE hoặc APPROVED còn hạn
                 .sorted(Comparator.comparingDouble(CourseResponse::getScore).reversed())
                 .toList();
     }
@@ -116,7 +122,7 @@ public class CourseService {
         // Thông báo gia sư → link đến tab khóa học
         notificationService.createNotification(savedCourse.getTutor().getUser(),
                 "✅ Khóa học '" + savedCourse.getTitle() + "' đã được duyệt và hiển thị trên hệ thống!",
-                "/tutor");
+                "/tutor?tab=courses");
         return mapToResponse(savedCourse);
     }
 
@@ -128,7 +134,7 @@ public class CourseService {
         Course savedCourse = courseRepository.save(course);
         notificationService.createNotification(savedCourse.getTutor().getUser(),
                 "❌ Khóa học '" + savedCourse.getTitle() + "' bị từ chối. Vui lòng kiểm tra lại nội dung.",
-                "/tutor");
+                "/tutor?tab=courses");
         return mapToResponse(savedCourse);
     }
 
@@ -165,6 +171,7 @@ public class CourseService {
     @Scheduled(fixedRate = 3600000)
     @Transactional
     public void expirePromotions() {
+        // 1. Hết hạn đẩy tin
         List<Course> expiredCourses = courseRepository.findAll().stream()
                 .filter(c -> c.isPromoted() && c.getPromotionExpiration() != null
                         && LocalDateTime.now().isAfter(c.getPromotionExpiration()))
@@ -174,9 +181,49 @@ public class CourseService {
             course.setPromotionExpiration(null);
             notificationService.createNotification(course.getTutor().getUser(),
                     "Gói đẩy tin cho khóa học '" + course.getTitle() + "' đã hết hạn.",
-                    "/tutor");
+                    "/tutor?tab=courses");
         }
         if (!expiredCourses.isEmpty()) courseRepository.saveAll(expiredCourses);
+
+        // 2. Tự động hủy đăng ký APPROVED mà học viên chưa thanh toán sau 24h
+        registrationRepository.findAll().stream()
+                .filter(r -> "APPROVED".equals(r.getStatus()))
+                .forEach(r -> {
+                    boolean invoiceExpired = paymentRepository
+                            .findByUserIdOrderByCreatedAtDesc(r.getStudent().getUser().getId())
+                            .stream()
+                            .anyMatch(p -> "TUITION_FEE".equals(p.getPaymentType())
+                                    && p.getRegistration() != null
+                                    && p.getRegistration().getId().equals(r.getId())
+                                    && p.getStatus() == PaymentStatus.PENDING
+                                    && p.getExpiresAt() != null
+                                    && LocalDateTime.now().isAfter(p.getExpiresAt()));
+                    if (invoiceExpired) {
+                        r.setStatus("REJECTED");
+                        registrationRepository.save(r);
+                        notificationService.createNotification(r.getStudent().getUser(),
+                                "⏰ Hóa đơn học phí lớp '" + r.getCourse().getTitle() +
+                                "' đã hết hạn 24 giờ. Đăng ký đã bị hủy. Bạn có thể đăng ký lại.",
+                                "/student?tab=payments");
+                        notificationService.createNotification(r.getCourse().getTutor().getUser(),
+                                "⏰ Học viên " + r.getStudent().getUser().getFullName() +
+                                " chưa thanh toán sau 24h. Đăng ký lớp '" + r.getCourse().getTitle() +
+                                "' đã tự động hủy. Khóa học đã mở lại.",
+                                "/tutor?tab=applications");
+                    }
+                });
+    }
+
+    /** Kiểm tra đăng ký APPROVED có hóa đơn đã hết hạn không */
+    private boolean isRegistrationInvoiceExpired(CourseRegistration reg) {
+        return paymentRepository.findByUserIdOrderByCreatedAtDesc(reg.getStudent().getUser().getId())
+                .stream()
+                .anyMatch(p -> "TUITION_FEE".equals(p.getPaymentType())
+                        && p.getRegistration() != null
+                        && p.getRegistration().getId().equals(reg.getId())
+                        && p.getStatus() == PaymentStatus.PENDING
+                        && p.getExpiresAt() != null
+                        && LocalDateTime.now().isAfter(p.getExpiresAt()));
     }
 
     private double calculateScore(Course course, Double avgRating, long totalRegistrations) {
@@ -192,9 +239,10 @@ public class CourseService {
         Double avgRating = reviewRepository.getAvgRatingByCourseId(course.getId());
         // Chỉ đếm học viên đang học (ACTIVE) — không đếm PENDING/REJECTED/COMPLETED
         long totalRegistrations = registrationRepository.countByCourseIdAndStatus(course.getId(), "ACTIVE");
-        // Lớp đầy khi có học viên APPROVED (chờ thanh toán) hoặc ACTIVE (đang học)
+        // Lớp đầy khi có học viên ACTIVE (đang học) hoặc APPROVED mà hóa đơn còn hạn
         long approvedCount = registrationRepository.findByCourseId(course.getId()).stream()
-                .filter(r -> "APPROVED".equals(r.getStatus()) || "ACTIVE".equals(r.getStatus()))
+                .filter(r -> "ACTIVE".equals(r.getStatus())
+                        || ("APPROVED".equals(r.getStatus()) && !isRegistrationInvoiceExpired(r)))
                 .count();
         double score = calculateScore(course, avgRating, totalRegistrations);
         return CourseResponse.builder()

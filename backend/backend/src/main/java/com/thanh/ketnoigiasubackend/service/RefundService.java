@@ -55,7 +55,13 @@ public class RefundService {
         // Thông báo cho học viên
         notificationService.createNotification(student,
                 "📋 Yêu cầu hoàn tiền #" + saved.getId() + " đã được gửi. Admin sẽ xem xét trong 3-5 ngày làm việc.",
-                "/student");
+                "/student?tab=payments");
+        // Thông báo Admin
+        notificationService.notifyAdmins(
+                "🔄 Học viên " + student.getFullName() + " yêu cầu hoàn tiền khóa '" +
+                (payment.getRegistration() != null ? payment.getRegistration().getCourse().getTitle()
+                    : payment.getCourse() != null ? payment.getCourse().getTitle() : "N/A") + "'.",
+                "/admin?tab=finance");
 
         return mapToResponse(saved);
     }
@@ -98,11 +104,11 @@ public class RefundService {
             }
             notificationService.createNotification(refund.getStudent(),
                     "✅ Yêu cầu hoàn tiền #" + refundId + " đã được duyệt! Tiền sẽ được chuyển về trong 3-5 ngày làm việc. Quyền truy cập lớp học đã bị thu hồi.",
-                    "/student");
+                    "/student?tab=payments");
         } else {
             notificationService.createNotification(refund.getStudent(),
                     "❌ Yêu cầu hoàn tiền #" + refundId + " bị từ chối. Lý do: " + adminNote,
-                    "/student");
+                    "/student?tab=payments");
         }
 
         return mapToResponse(refundRepository.save(refund));

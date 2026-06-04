@@ -73,7 +73,7 @@ public class AdminInteractionService {
             // Thông báo cho từng học viên bị ảnh hưởng
             notificationService.createNotification(reg.getStudent().getUser(),
                     "⚠️ Lớp học '" + reg.getCourse().getTitle() + "' đã bị hủy do Gia sư vi phạm chính sách.",
-                    "/student");
+                    "/student?tab=courses");
         }
         registrationRepository.saveAll(activeRegs);
     }
@@ -133,11 +133,11 @@ public class AdminInteractionService {
             reviewRepository.save(review);
 
             notificationService.createNotification(complaint.getTutor().getUser(),
-                    "✅ Khiếu nại của bạn thành công. Đánh giá sai sự thật đã bị gỡ bỏ.", "/tutor");
+                    "✅ Khiếu nại của bạn thành công. Đánh giá sai sự thật đã bị gỡ bỏ.", "/tutor?tab=reviews");
         } else {
             complaint.setStatus("REJECTED");
             notificationService.createNotification(complaint.getTutor().getUser(),
-                    "❌ Khiếu nại của bạn bị từ chối. Admin xác nhận đánh giá là hợp lệ.", "/tutor");
+                    "❌ Khiếu nại của bạn bị từ chối. Admin xác nhận đánh giá là hợp lệ.", "/tutor?tab=reviews");
         }
         complaintRepository.save(complaint);
     }

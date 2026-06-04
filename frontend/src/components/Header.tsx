@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 import '../css/Header.css';
 
 const Header = () => {
@@ -32,6 +33,7 @@ const Header = () => {
                             <Link to="/profile" className="btn-dashboard" style={{ background: '#f0fdf4', color: '#16a34a' }}>
                                 ⚙️ Hồ sơ
                             </Link>
+                            <NotificationBell />
                             <button onClick={logout} className="btn-logout">Đăng xuất</button>
                         </div>
                     ) : (

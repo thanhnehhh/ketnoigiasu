@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ChatBox from '../components/ChatBox';
@@ -15,7 +16,14 @@ interface Session {
     onlineLink: string;
     isCompleted: boolean;
     startTime: string;
-    canConfirm: boolean; // BE tính: startTime đã qua && chưa hoàn thành
+    canConfirm: boolean;
+    studentFeedback: string | null;
+    // Xác nhận 2 chiều
+    studentConfirmed: boolean;
+    studentDisputed: boolean;
+    disputeReason: string | null;
+    studentConfirmedAt: string | null;
+    canStudentConfirm: boolean;
 }
 
 interface Material {
@@ -76,6 +84,16 @@ export default function CourseRoom() {
     const [reportTitle, setReportTitle] = useState('');
     const [reportContent, setReportContent] = useState('');
 
+    // Phản hồi buổi học (student)
+    const [feedbackModal, setFeedbackModal] = useState<{ open: boolean; session: Session | null }>({ open: false, session: null });
+    const [feedbackText, setFeedbackText] = useState('');
+    const [feedbackMsg, setFeedbackMsg] = useState('');
+
+    // Phản đối buổi học (student)
+    const [disputeModal, setDisputeModal] = useState<{ open: boolean; session: Session | null }>({ open: false, session: null });
+    const [disputeReason, setDisputeReason] = useState('');
+    const [disputeMsg, setDisputeMsg] = useState('');
+
     // Báo cáo phụ huynh (tutor)
     const [activeStudents, setActiveStudents] = useState<ActiveStudent[]>([]);
     const [selectedRegId, setSelectedRegId] = useState<number | null>(null);
@@ -132,6 +150,18 @@ export default function CourseRoom() {
         finally { setLoading(false); }
     };
 
+    // Chỉ refetch sessions (không show loading spinner — dùng sau saveLog/saveSchedule)
+    const fetchSessions = async () => {
+        if (!user || !courseId) return;
+        try {
+            const res = user.role === 'STUDENT'
+                ? await api.get(`/student/activities/course/${courseId}/sessions`)
+                : await api.get(`/tutor/activities/course/${courseId}`);
+            const sorted = [...res.data].sort((a: Session, b: Session) => a.sessionOrder - b.sessionOrder);
+            setSessions(sorted);
+        } catch (e) { console.error(e); }
+    };
+
     const flash = (text: string, err = false) => {
         setMsg(text); setIsErr(err);
         setTimeout(() => setMsg(''), 3000);
@@ -151,7 +181,7 @@ export default function CourseRoom() {
             });
             flash('✅ Đã cập nhật lịch học!');
             setScheduleModal({ open: false, session: null });
-            fetchAll();
+            fetchSessions();
         } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
     };
 
@@ -172,7 +202,7 @@ export default function CourseRoom() {
             }
             setLogModal({ open: false, session: null, isEdit: false });
             setLogNotes('');
-            fetchAll();
+            fetchSessions();
         } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
     };
 
@@ -210,12 +240,28 @@ export default function CourseRoom() {
     };
 
     const deleteMaterial = async (id: number) => {
-        if (!confirm('Xóa tài liệu này?')) return;
-        try {
-            await api.delete(`/materials/${id}`);
-            flash('✅ Đã xóa tài liệu');
-            fetchAll();
-        } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
+        toast((t) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span>Xóa tài liệu này?</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                        style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 600 }}
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            try {
+                                await api.delete(`/materials/${id}`);
+                                toast.success('Đã xóa tài liệu');
+                                fetchMaterials();
+                            } catch { toast.error('Xóa thất bại'); }
+                        }}
+                    >Xóa</button>
+                    <button
+                        style={{ background: '#e2e8f0', color: '#374151', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer' }}
+                        onClick={() => toast.dismiss(t.id)}
+                    >Hủy</button>
+                </div>
+            </div>
+        ), { duration: 10000 });
     };
 
     const submitReport = async (e: React.FormEvent) => {
@@ -231,6 +277,49 @@ export default function CourseRoom() {
             setReportTitle('');
             setReportContent('');
         } catch (e: any) { flash('❌ ' + (e.response?.data?.message || 'Lỗi'), true); }
+    };
+
+    const submitFeedback = async () => {
+        if (!feedbackModal.session || !feedbackText.trim()) return;
+        try {
+            const res = await api.put(`/student/activities/session/${feedbackModal.session.id}/feedback`,
+                feedbackText, { headers: { 'Content-Type': 'text/plain' } });
+            setSessions(prev => prev.map(s => s.id === feedbackModal.session!.id ? { ...s, studentFeedback: res.data.studentFeedback } : s));
+            setFeedbackMsg('✅ Đã gửi phản hồi!');
+            setTimeout(() => { setFeedbackModal({ open: false, session: null }); setFeedbackMsg(''); setFeedbackText(''); }, 1200);
+        } catch (e: any) {
+            setFeedbackMsg('❌ ' + (e.response?.data?.message || 'Lỗi gửi phản hồi'));
+        }
+    };
+
+    const confirmSession = async (sessionId: number) => {
+        try {
+            const res = await api.put(`/student/activities/session/${sessionId}/confirm`);
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, ...res.data } : s));
+            toast.success('✅ Đã xác nhận buổi học!');
+        } catch (e: any) {
+            toast.error(e.response?.data?.message || 'Lỗi xác nhận');
+        }
+    };
+
+    const submitDispute = async () => {
+        if (!disputeModal.session || !disputeReason.trim()) {
+            setDisputeMsg('❌ Vui lòng nhập lý do phản đối');
+            return;
+        }
+        try {
+            const res = await api.put(`/student/activities/session/${disputeModal.session.id}/dispute`,
+                { reason: disputeReason });
+            setSessions(prev => prev.map(s => s.id === disputeModal.session!.id ? { ...s, ...res.data } : s));
+            setDisputeMsg('✅ Đã gửi phản đối! Admin sẽ xem xét và liên hệ với bạn.');
+            setTimeout(() => {
+                setDisputeModal({ open: false, session: null });
+                setDisputeMsg('');
+                setDisputeReason('');
+            }, 2000);
+        } catch (e: any) {
+            setDisputeMsg('❌ ' + (e.response?.data?.message || 'Lỗi gửi phản đối'));
+        }
     };
 
     const sendParentReport = async () => {
@@ -372,14 +461,15 @@ export default function CourseRoom() {
                                     <div className="cr-sessions">
                                         {sessions.map((s, idx) => {
                                             const prevNotDone = idx > 0 && !sessions[idx - 1].isCompleted;
+                                            const now = new Date();
+                                            const startDate = s.startTime ? new Date(s.startTime) : null;
+                                            const isPast = startDate ? now > startDate : false;
 
                                             const getStatus = () => {
                                                 if (s.isCompleted) return { label: '✅ Đã hoàn thành', cls: 'done' };
-                                                if (!s.startTime) return { label: '⏳ Chưa lên lịch', cls: 'pending' };
-                                                const start = new Date(s.startTime);
-                                                if (new Date() < start) return { label: '📅 Sắp diễn ra', cls: 'scheduled' };
-                                                if (s.canConfirm) return { label: '🔔 Chờ xác nhận', cls: 'confirm' };
-                                                return { label: '📅 Đã lên lịch', cls: 'scheduled' };
+                                                if (!startDate) return { label: '⏳ Chưa lên lịch', cls: 'pending' };
+                                                if (!isPast) return { label: '📅 Sắp diễn ra', cls: 'scheduled' };
+                                                return { label: '🕐 Chưa xác nhận', cls: 'confirm' };
                                             };
                                             const status = getStatus();
 
@@ -425,62 +515,132 @@ export default function CourseRoom() {
                                                             </div>
                                                         )}
 
+                                                        {/* Phản hồi của học viên — chỉ hiện khi buổi đã hoàn thành */}
+                                                        {isStudent && s.isCompleted && (
+                                                            <div style={{ marginTop: '10px' }}>
+                                                                {/* Khu vực xác nhận 2 chiều */}
+                                                                {s.canStudentConfirm && (
+                                                                    <div style={{ background: '#fffbeb', border: '2px solid #fbbf24', borderRadius: '10px', padding: '12px 14px', marginBottom: '10px' }}>
+                                                                        <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#92400e', margin: '0 0 8px' }}>
+                                                                            📋 Gia sư vừa xác nhận đã dạy buổi này. Bạn có xác nhận đã học không?
+                                                                        </p>
+                                                                        <p style={{ fontSize: '0.78rem', color: '#92400e', margin: '0 0 10px' }}>
+                                                                            ⏰ Nếu không phản hồi trong 48h, hệ thống sẽ tự động xác nhận.
+                                                                        </p>
+                                                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                                                            <button
+                                                                                className="cr-btn-primary"
+                                                                                style={{ fontSize: '0.85rem', padding: '6px 16px' }}
+                                                                                onClick={() => confirmSession(s.id)}
+                                                                            >
+                                                                                ✅ Xác nhận đã học
+                                                                            </button>
+                                                                            <button
+                                                                                className="cr-btn-outline"
+                                                                                style={{ fontSize: '0.85rem', padding: '6px 16px', color: '#ef4444', borderColor: '#ef4444' }}
+                                                                                onClick={() => { setDisputeModal({ open: true, session: s }); setDisputeReason(''); setDisputeMsg(''); }}
+                                                                            >
+                                                                                ❌ Phản đối
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Đã xác nhận */}
+                                                                {s.studentConfirmed && !s.canStudentConfirm && (
+                                                                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 14px', marginBottom: '10px', fontSize: '0.82rem', color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                        ✅ <strong>Bạn đã xác nhận buổi học này</strong>
+                                                                        {s.studentConfirmedAt && (
+                                                                            <span style={{ color: '#6b7280', fontWeight: 400 }}>
+                                                                                — {new Date(s.studentConfirmedAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Đang phản đối */}
+                                                                {s.studentDisputed && (
+                                                                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '8px 14px', marginBottom: '10px', fontSize: '0.82rem', color: '#991b1b' }}>
+                                                                        ⚠️ <strong>Bạn đang phản đối buổi học này.</strong> Admin sẽ xem xét và liên hệ với bạn.
+                                                                        {s.disputeReason && (
+                                                                            <p style={{ margin: '4px 0 0', color: '#7f1d1d' }}>Lý do: {s.disputeReason}</p>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Phản hồi nội dung buổi học */}
+                                                                {s.studentFeedback ? (
+                                                                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 14px' }}>
+                                                                        <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#065f46', marginBottom: '4px' }}>💬 Phản hồi của bạn:</p>
+                                                                        <p style={{ fontSize: '0.88rem', color: '#374151', margin: 0 }}>{s.studentFeedback}</p>
+                                                                        <button className="cr-btn-outline" style={{ marginTop: '8px', fontSize: '0.78rem', padding: '4px 10px' }}
+                                                                            onClick={() => { setFeedbackModal({ open: true, session: s }); setFeedbackText(s.studentFeedback || ''); setFeedbackMsg(''); }}>
+                                                                            ✏️ Sửa phản hồi
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button className="cr-btn-outline" style={{ fontSize: '0.85rem' }}
+                                                                        onClick={() => { setFeedbackModal({ open: true, session: s }); setFeedbackText(''); setFeedbackMsg(''); }}>
+                                                                        💬 Gửi phản hồi buổi học
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+
                                                         {/* Actions cho Tutor */}
                                                         {isTutor && (
                                                             <div className="cr-session-actions">
-                                                                <button className="cr-btn-outline"
-                                                                    onClick={() => {
-                                                                        setScheduleModal({ open: true, session: s });
-                                                                        setScheduleForm({
-                                                                            onlineLink: s.onlineLink || '',
-                                                                            startTime: s.startTime ? s.startTime.slice(0, 16) : ''
-                                                                        });
-                                                                    }}>
-                                                                    📅 {s.startTime ? 'Sửa lịch' : 'Lên lịch'}
-                                                                </button>
-
-                                                                {!s.isCompleted && (
-                                                                    <button
-                                                                        className="cr-btn-primary"
-                                                                        disabled={!s.canConfirm || prevNotDone}
-                                                                        style={{ opacity: (!s.canConfirm || prevNotDone) ? 0.45 : 1, cursor: (!s.canConfirm || prevNotDone) ? 'not-allowed' : 'pointer' }}
-                                                                        title={
-                                                                            prevNotDone ? `Hoàn thành buổi ${s.sessionOrder - 1} trước` :
-                                                                            !s.startTime ? 'Lên lịch trước' :
-                                                                            !s.canConfirm ? 'Chưa đến giờ học' : ''
-                                                                        }
-                                                                        onClick={() => {
-                                                                            if (!s.canConfirm || prevNotDone) return;
-                                                                            setLogModal({ open: true, session: s, isEdit: false });
-                                                                            setLogNotes('');
-                                                                        }}>
-                                                                        ✅ Xác nhận đã dạy
-                                                                    </button>
-                                                                )}
-
-                                                                {/* Nút sửa nhật ký — chỉ hiện trong 24h sau khi xác nhận */}
-                                                                {s.isCompleted && (
-                                                                    <button
-                                                                        className="cr-btn-outline"
-                                                                        onClick={() => {
-                                                                            setLogModal({ open: true, session: s, isEdit: true });
-                                                                            setLogNotes(s.notes || '');
-                                                                        }}>
-                                                                        ✏️ Sửa nhật ký
-                                                                    </button>
-                                                                )}
-
-                                                                {!s.isCompleted && prevNotDone && (
-                                                                    <span className="cr-lock-hint">🔒 Hoàn thành buổi {s.sessionOrder - 1} trước</span>
-                                                                )}
-                                                                {!s.isCompleted && !prevNotDone && !s.canConfirm && s.startTime && (
-                                                                    <span className="cr-lock-hint">
-                                                                        ⏰ Mở sau {new Date(s.startTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                                                    </span>
-                                                                )}
-                                                                {!s.isCompleted && !s.startTime && (
-                                                                    <span className="cr-lock-hint">📅 Lên lịch trước để mở nút xác nhận</span>
-                                                                )}
+                                                                {(() => {
+                                                                    if (s.isCompleted) {
+                                                                        // Đã xác nhận → chỉ sửa nhật ký
+                                                                        return (
+                                                                            <button className="cr-btn-outline"
+                                                                                onClick={() => { setLogModal({ open: true, session: s, isEdit: true }); setLogNotes(s.notes || ''); }}>
+                                                                                ✏️ Sửa nhật ký
+                                                                            </button>
+                                                                        );
+                                                                    }
+                                                                    if (!startDate) {
+                                                                        // Chưa lên lịch
+                                                                        return (
+                                                                            <button className="cr-btn-outline"
+                                                                                onClick={() => { setScheduleModal({ open: true, session: s }); setScheduleForm({ onlineLink: '', startTime: '' }); }}>
+                                                                                📅 Lên lịch
+                                                                            </button>
+                                                                        );
+                                                                    }
+                                                                    if (!isPast) {
+                                                                        // Đã lên lịch, chưa đến giờ → cho sửa lịch
+                                                                        return (
+                                                                            <>
+                                                                                <button className="cr-btn-outline"
+                                                                                    onClick={() => { setScheduleModal({ open: true, session: s }); setScheduleForm({ onlineLink: s.onlineLink || '', startTime: s.startTime.slice(0, 16) }); }}>
+                                                                                    ✏️ Sửa lịch
+                                                                                </button>
+                                                                                <span className="cr-lock-hint">
+                                                                                    ⏰ Mở lúc {startDate.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                                                </span>
+                                                                            </>
+                                                                        );
+                                                                    }
+                                                                    // Đã qua giờ → nút xác nhận
+                                                                    return (
+                                                                        <>
+                                                                            <button className="cr-btn-primary"
+                                                                                disabled={prevNotDone}
+                                                                                style={{ opacity: prevNotDone ? 0.45 : 1, cursor: prevNotDone ? 'not-allowed' : 'pointer' }}
+                                                                                title={prevNotDone ? `Hoàn thành buổi ${s.sessionOrder - 1} trước` : ''}
+                                                                                onClick={() => {
+                                                                                    if (prevNotDone) return;
+                                                                                    setLogModal({ open: true, session: s, isEdit: false });
+                                                                                    setLogNotes('');
+                                                                                }}>
+                                                                                ✅ Xác nhận đã dạy
+                                                                            </button>
+                                                                            {prevNotDone && <span className="cr-lock-hint">🔒 Hoàn thành buổi {s.sessionOrder - 1} trước</span>}
+                                                                        </>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         )}
                                                     </div>
@@ -608,15 +768,15 @@ export default function CourseRoom() {
                     <div className="cr-modal" onClick={e => e.stopPropagation()}>
                         <h3>📅 Cập nhật lịch — {scheduleModal.session.title}</h3>
                         <div className="cr-form-group">
-                            <label>Link phòng học online (Google Meet / Zoom)</label>
+                            <label>Thời gian bắt đầu *</label>
+                            <input type="datetime-local" value={scheduleForm.startTime}
+                                onChange={e => setScheduleForm(p => ({ ...p, startTime: e.target.value }))} />
+                        </div>
+                        <div className="cr-form-group">
+                            <label>Link phòng học online <span style={{ fontWeight: 400, color: '#94a3b8' }}>(tùy chọn — nếu dạy online)</span></label>
                             <input value={scheduleForm.onlineLink}
                                 onChange={e => setScheduleForm(p => ({ ...p, onlineLink: e.target.value }))}
                                 placeholder="https://meet.google.com/xxx-xxxx-xxx" />
-                        </div>
-                        <div className="cr-form-group">
-                            <label>Thời gian bắt đầu</label>
-                            <input type="datetime-local" value={scheduleForm.startTime}
-                                onChange={e => setScheduleForm(p => ({ ...p, startTime: e.target.value }))} />
                         </div>
                         <div className="cr-modal-actions">
                             <button className="cr-btn-primary" onClick={saveSchedule}>💾 Lưu lịch học</button>
@@ -652,6 +812,72 @@ export default function CourseRoom() {
             )}
 
             <Footer />
+
+            {/* MODAL PHẢN HỒI BUỔI HỌC (STUDENT) */}
+            {feedbackModal.open && feedbackModal.session && (
+                <div className="cr-modal-overlay" onClick={() => setFeedbackModal({ open: false, session: null })}>
+                    <div className="cr-modal" onClick={e => e.stopPropagation()}>
+                        <h3>💬 Phản hồi — {feedbackModal.session.title}</h3>
+                        <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '1rem' }}>
+                            Chia sẻ cảm nhận của bạn về buổi học này để giúp gia sư cải thiện chất lượng dạy học.
+                        </p>
+                        <div className="cr-form-group">
+                            <label>Nội dung phản hồi *</label>
+                            <textarea rows={4} value={feedbackText}
+                                onChange={e => setFeedbackText(e.target.value)}
+                                placeholder="Ví dụ: Buổi học rất hiệu quả, gia sư giảng dễ hiểu. Tuy nhiên cần thêm bài tập thực hành..." />
+                        </div>
+                        {feedbackMsg && <p style={{ color: feedbackMsg.startsWith('✅') ? '#10b981' : '#ef4444', fontSize: '0.88rem' }}>{feedbackMsg}</p>}
+                        <div className="cr-modal-actions">
+                            <button className="cr-btn-primary" onClick={submitFeedback} disabled={!feedbackText.trim()}>
+                                💬 Gửi phản hồi
+                            </button>
+                            <button className="cr-btn-outline" onClick={() => { setFeedbackModal({ open: false, session: null }); setFeedbackText(''); setFeedbackMsg(''); }}>
+                                Hủy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL PHẢN ĐỐI BUỔI HỌC (STUDENT) */}
+            {disputeModal.open && disputeModal.session && (
+                <div className="cr-modal-overlay" onClick={() => setDisputeModal({ open: false, session: null })}>
+                    <div className="cr-modal" onClick={e => e.stopPropagation()}>
+                        <h3>❌ Phản đối — {disputeModal.session.title}</h3>
+                        <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '1rem' }}>
+                            Nếu gia sư không dạy thực sự hoặc có vấn đề với buổi học này, hãy mô tả lý do.
+                            Admin sẽ xem xét và liên hệ với bạn trong vòng <strong>24h</strong>.
+                        </p>
+                        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', marginBottom: '1rem', fontSize: '0.82rem', color: '#991b1b' }}>
+                            ⚠️ Hành động này không thể hoàn tác. Chỉ phản đối khi có cơ sở thực sự.
+                        </div>
+                        <div className="cr-form-group">
+                            <label>Lý do phản đối *</label>
+                            <textarea rows={4} value={disputeReason}
+                                onChange={e => setDisputeReason(e.target.value)}
+                                placeholder="Ví dụ: Gia sư không vào phòng học đúng giờ, buổi học chỉ diễn ra 10 phút, gia sư không giảng đúng nội dung cam kết..." />
+                        </div>
+                        {disputeMsg && (
+                            <p style={{ color: disputeMsg.startsWith('✅') ? '#10b981' : '#ef4444', fontSize: '0.88rem', marginBottom: '8px' }}>
+                                {disputeMsg}
+                            </p>
+                        )}
+                        <div className="cr-modal-actions">
+                            <button className="cr-btn-outline"
+                                style={{ color: '#ef4444', borderColor: '#ef4444' }}
+                                onClick={submitDispute}
+                                disabled={!disputeReason.trim()}
+                            >
+                                ❌ Gửi phản đối
+                            </button>
+                            <button className="cr-btn-outline" onClick={() => { setDisputeModal({ open: false, session: null }); setDisputeReason(''); setDisputeMsg(''); }}>
+                                Hủy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -18,7 +18,10 @@ import '../css/RegisterTutor.css';
 type Step = 'email' | 'info';
 
 const SUBJECTS = ['Toán', 'Lý', 'Hóa', 'Văn', 'Tiếng Anh', 'Tiếng Trung', 'Tiếng Nhật', 'IELTS', 'TOEIC', 'Lịch sử', 'Địa lý', 'Sinh học', 'Tin học'];
-const GRADES   = [...Array.from({ length: 12 }, (_, i) => `Lớp ${i + 1}`), 'Ngoại ngữ'];
+const GRADES = [
+    ...Array.from({ length: 12 }, (_, i) => `Lớp ${i + 1}`),
+    'Tiếng Anh', 'Tiếng Trung', 'Tiếng Nhật', 'IELTS', 'TOEIC'
+];
 
 export default function RegisterTutor() {
     const navigate = useNavigate();
