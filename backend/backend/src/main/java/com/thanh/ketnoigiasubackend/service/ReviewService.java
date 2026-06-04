@@ -51,7 +51,7 @@ public class ReviewService {
         notificationService.createNotification(
                 saved.getTutor().getUser(),
                 "⭐ Học viên " + user.getFullName() + " đánh giá " + saved.getRating() + " sao cho lớp '" + saved.getRegistration().getCourse().getTitle() + "'.",
-                "/tutor"
+                "/tutor?tab=reviews"
         );
 
         return mapToResponse(saved);
@@ -100,7 +100,7 @@ public class ReviewService {
         notificationService.createNotification(
                 saved.getStudent().getUser(),
                 "💬 Gia sư " + saved.getTutor().getUser().getFullName() + " đã phản hồi đánh giá của bạn.",
-                "/student"
+                "/student?tab=courses"
         );
         return mapToResponse(saved);
     }

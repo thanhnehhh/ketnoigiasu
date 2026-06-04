@@ -1,4 +1,5 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const BASE_URL = 'http://localhost:8080';
 
@@ -55,8 +56,8 @@ api.interceptors.response.use(
                 redirecting = true;
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-                window.location.replace('/login');
+                toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+                setTimeout(() => window.location.replace('/login'), 1500);
             }
         }
         return Promise.reject(error);

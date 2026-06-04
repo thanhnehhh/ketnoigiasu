@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../css/Dashboard.css';
@@ -25,6 +26,8 @@ interface Registration {
     status: string;
     appliedAt: string;
     notes: string;
+    completedSessions: number;
+    totalSessions: number;
 }
 
 interface Notification {
@@ -85,6 +88,15 @@ export default function TutorDashboard() {
 
     // Filter đơn đăng ký
     const [appFilter, setAppFilter] = useState<'PENDING' | 'DONE'>('PENDING');
+    // Filter khóa học
+    const [courseFilter, setCourseFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVE' | 'REJECTED' | 'HIDDEN'>('ALL');
+    const [seenCourseFilters, setSeenCourseFilters] = useState<Set<string>>(new Set(['ALL']));
+    // Filter thanh toán gia sư
+    const [payFilter, setPayFilter] = useState<'ALL' | 'PENDING' | 'PENDING_VERIFY' | 'SUCCESS'>('ALL');
+    const [seenPayFilters, setSeenPayFilters] = useState<Set<string>>(new Set(['ALL']));
+    // Filter đánh giá
+    const [reviewFilter, setReviewFilter] = useState<'ALL' | 'NO_REPLY' | 'REPLIED'>('ALL');
+    const [seenReviewFilters, setSeenReviewFilters] = useState<Set<string>>(new Set(['ALL']));
     const [courseModal, setCourseModal] = useState<{ open: boolean; editing: Course | null }>({ open: false, editing: null });
     const [courseForm, setCourseForm] = useState({ title: '', description: '', pricePerSession: '', totalSessions: '', subjectId: '1', teachingMode: 'BOTH' });
     const [courseMsg, setCourseMsg] = useState('');
@@ -160,11 +172,34 @@ export default function TutorDashboard() {
     const requestPromote = async (courseId: number) => {
         try {
             const res = await api.put(`/courses/${courseId}/promote`);
-            alert(`Yêu cầu đẩy tin đã tạo! Mã hóa đơn: #${res.data.id}. Vui lòng nộp minh chứng chuyển khoản 50.000đ.`);
+            toast.success(`Yêu cầu đẩy tin đã tạo! Mã hóa đơn: #${res.data.id}. Vui lòng nộp minh chứng chuyển khoản 50.000đ.`);
             fetchAll();
         } catch (e: any) {
-            alert('❌ ' + (e.response?.data?.message || 'Lỗi'));
+            toast.error(e.response?.data?.message || 'Lỗi');
         }
+    };
+
+    const completeCourse = (registrationId: number) => {
+        toast((t) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span>Xác nhận hoàn thành khóa học này?</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 600 }}
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            try {
+                                await api.put(`/student/registrations/${registrationId}/complete`);
+                                toast.success('Đã xác nhận hoàn thành khóa học!');
+                                fetchAll();
+                            } catch (e: any) {
+                                toast.error(e.response?.data?.message || 'Lỗi');
+                            }
+                        }}>Xác nhận</button>
+                    <button style={{ background: '#e2e8f0', color: '#374151', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer' }}
+                        onClick={() => toast.dismiss(t.id)}>Hủy</button>
+                </div>
+            </div>
+        ), { duration: 10000 });
     };
 
     const reviewApplication = async (id: number, status: 'APPROVED' | 'REJECTED') => {
@@ -249,9 +284,6 @@ export default function TutorDashboard() {
                         <button className={tab === 'payments' ? 'active' : ''} onClick={() => setTab('payments')}>
                             💳 Thanh toán
                         </button>
-                        <button className={tab === 'notifications' ? 'active' : ''} onClick={() => setTab('notifications')}>
-                            🔔 Thông báo {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-                        </button>
                         <button className={tab === 'reviews' ? 'active' : ''} onClick={() => setTab('reviews')}>
                             ⭐ Đánh giá {reviews.length > 0 && <span className="badge" style={{ background: '#f59e0b' }}>{reviews.length}</span>}
                         </button>
@@ -272,7 +304,7 @@ export default function TutorDashboard() {
                             {/* TAB: KHÓA HỌC */}
                             {tab === 'courses' && (
                                 <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                         <h2 className="dash-title" style={{ margin: 0 }}>Khóa học của tôi</h2>
                                         <button className="btn-primary" onClick={() => {
                                             setCourseForm({ title: '', description: '', pricePerSession: '', totalSessions: '', subjectId: subjects.length > 0 ? String(subjects[0].id) : '1', teachingMode: 'BOTH' });
@@ -283,8 +315,32 @@ export default function TutorDashboard() {
                                     {courses.length === 0 ? (
                                         <div className="empty-state"><p>Bạn chưa có khóa học nào.</p></div>
                                     ) : (
+                                        <>
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',            label: 'Tất cả',       color: '#64748b' },
+                                                { key: 'APPROVED',       label: '✅ Đang hoạt động', color: '#10b981' },
+                                                { key: 'PENDING_APPROVE',label: '⏳ Chờ duyệt', color: '#f59e0b' },
+                                                { key: 'REJECTED',       label: '✖ Bị từ chối', color: '#ef4444' },
+                                                { key: 'HIDDEN',         label: '🙈 Đã ẩn',     color: '#94a3b8' },
+                                            ] as const).map(f => {
+                                                const count = f.key === 'ALL' ? courses.length : courses.filter(c => c.status === f.key).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenCourseFilters.has(f.key);
+                                                return (
+                                                    <button key={f.key}
+                                                        className={`course-filter-btn ${courseFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => { setCourseFilter(f.key); setSeenCourseFilters(p => new Set([...p, f.key])); }}>
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {courses.map(c => {
+                                            {courses.filter(c => courseFilter === 'ALL' || c.status === courseFilter).map(c => {
                                                 const s = COURSE_STATUS[c.status] || { label: c.status, color: '#64748b' };
                                                 return (
                                                     <div key={c.id} className="reg-card">
@@ -310,6 +366,7 @@ export default function TutorDashboard() {
                                                 );
                                             })}
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -369,6 +426,21 @@ export default function TutorDashboard() {
                                                                 <button className="btn-sm btn-danger" onClick={() => reviewApplication(app.id, 'REJECTED')}>❌ Từ chối</button>
                                                             </div>
                                                         )}
+                                                        {app.status === 'ACTIVE' && (
+                                                            <div className="reg-actions">
+                                                                {app.completedSessions >= app.totalSessions ? (
+                                                                    <button className="btn-sm btn-primary" onClick={() => completeCourse(app.id)}>
+                                                                        🎓 Hoàn thành khóa học
+                                                                    </button>
+                                                                ) : (
+                                                                    <button className="btn-sm btn-outline" disabled
+                                                                        title={`Còn ${app.totalSessions - app.completedSessions} buổi chưa xong`}
+                                                                        style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                                                                        📊 {app.completedSessions}/{app.totalSessions} buổi
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -384,8 +456,31 @@ export default function TutorDashboard() {
                                     {payments.length === 0 ? (
                                         <div className="empty-state"><p>Chưa có giao dịch nào.</p></div>
                                     ) : (
+                                        <>
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',            label: 'Tất cả',          color: '#64748b' },
+                                                { key: 'PENDING',        label: '⏳ Chờ nộp proof', color: '#f59e0b' },
+                                                { key: 'PENDING_VERIFY', label: '🔍 Chờ duyệt',    color: '#3b82f6' },
+                                                { key: 'SUCCESS',        label: '✅ Đã hoàn tất',  color: '#10b981' },
+                                            ] as const).map(f => {
+                                                const count = f.key === 'ALL' ? payments.length : payments.filter(p => p.status === f.key).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenPayFilters.has(f.key);
+                                                return (
+                                                    <button key={f.key}
+                                                        className={`course-filter-btn ${payFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => { setPayFilter(f.key); setSeenPayFilters(p => new Set([...p, f.key])); }}>
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {payments.map(p => (
+                                            {payments.filter(p => payFilter === 'ALL' || p.status === payFilter).map(p => (
                                                 <div key={p.id} className="reg-card">
                                                     <div className="reg-card-header">
                                                         <h3>{p.paymentType === 'PLATFORM_FEE' ? '💵 Phí sàn' : '🔥 Đẩy tin: ' + (p.courseTitle || '')}</h3>
@@ -394,42 +489,22 @@ export default function TutorDashboard() {
                                                         </span>
                                                     </div>
                                                     <p>💰 {p.amount?.toLocaleString('vi-VN')}đ &nbsp;|&nbsp; 📅 {new Date(p.createdAt).toLocaleDateString('vi-VN')}</p>
-                                                    {/* Nộp proof cho PROMOTE */}
                                                     {p.paymentType === 'PROMOTE' && p.status === 'PENDING' && (
                                                         <button className="btn-sm btn-primary" style={{ marginTop: '8px' }}
-                                                            onClick={() => alert(`Chuyển khoản 50.000đ rồi dùng mã hóa đơn #${p.id} để nộp minh chứng`)}>
+                                                            onClick={() => toast(`Chuyển khoản 50.000đ rồi dùng mã hóa đơn #${p.id} để nộp minh chứng`, { icon: '📤' })}>
                                                             📤 Nộp minh chứng
                                                         </button>
                                                     )}
                                                 </div>
                                             ))}
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}
 
-                            {/* TAB: THÔNG BÁO */}
-                            {tab === 'notifications' && (
-                                <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                        <h2 className="dash-title" style={{ margin: 0 }}>Thông báo</h2>
-                                        {unreadCount > 0 && <button className="btn-sm btn-outline" onClick={markAllRead}>Đọc tất cả</button>}
-                                    </div>
-                                    <div className="noti-list">
-                                        {notifications.map(n => (
-                                            <div key={n.id} className={`noti-item ${!n.isRead ? 'unread' : ''}`}
-                                                onClick={() => !n.isRead && api.put(`/notifications/${n.id}/read`).then(() =>
-                                                    setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, isRead: true } : x)))}>
-                                                <div className="noti-dot" style={{ background: n.isRead ? '#e2e8f0' : '#4f46e5' }} />
-                                                <div className="noti-content">
-                                                    <p>{n.message}</p>
-                                                    <span>{new Date(n.createdAt).toLocaleString('vi-VN')}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                            {/* TAB: THÔNG BÁO — đã chuyển lên Header */}
+                            {tab === 'notifications' && null}
 
                             {/* TAB: ĐÁNH GIÁ */}
                             {tab === 'reviews' && (
@@ -438,8 +513,36 @@ export default function TutorDashboard() {
                                     {reviews.length === 0 ? (
                                         <div className="empty-state"><p>Chưa có đánh giá nào.</p></div>
                                     ) : (
+                                        <>
+                                        <div className="course-filter-bar">
+                                            {([
+                                                { key: 'ALL',      label: 'Tất cả',          color: '#64748b' },
+                                                { key: 'NO_REPLY', label: '💬 Chưa phản hồi', color: '#f59e0b' },
+                                                { key: 'REPLIED',  label: '✅ Đã phản hồi',  color: '#10b981' },
+                                            ] as const).map(f => {
+                                                const count = f.key === 'ALL' ? reviews.length
+                                                    : f.key === 'NO_REPLY' ? reviews.filter(r => !r.tutorReply).length
+                                                    : reviews.filter(r => !!r.tutorReply).length;
+                                                if (f.key !== 'ALL' && count === 0) return null;
+                                                const hasNew = f.key !== 'ALL' && count > 0 && !seenReviewFilters.has(f.key);
+                                                return (
+                                                    <button key={f.key}
+                                                        className={`course-filter-btn ${reviewFilter === f.key ? 'active' : ''}`}
+                                                        style={{ '--filter-color': f.color } as any}
+                                                        onClick={() => { setReviewFilter(f.key); setSeenReviewFilters(p => new Set([...p, f.key])); }}>
+                                                        {hasNew && <span className="filter-dot" />}
+                                                        {f.label}
+                                                        <span className="course-filter-count">{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <div className="card-list">
-                                            {reviews.map(r => (
+                                            {reviews.filter(r =>
+                                                reviewFilter === 'ALL' ? true
+                                                : reviewFilter === 'NO_REPLY' ? !r.tutorReply
+                                                : !!r.tutorReply
+                                            ).map(r => (
                                                 <div key={r.id} className="reg-card">
                                                     <div className="reg-card-header">
                                                         <div>
@@ -471,6 +574,7 @@ export default function TutorDashboard() {
                                                 </div>
                                             ))}
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}

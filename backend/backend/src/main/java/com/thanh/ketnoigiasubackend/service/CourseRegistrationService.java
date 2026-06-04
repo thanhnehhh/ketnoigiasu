@@ -22,6 +22,7 @@ public class CourseRegistrationService {
     private final StudentProfileRepository studentProfileRepository;
     private final PaymentRepository paymentRepository;
     private final NotificationService notificationService;
+    private final SessionRepository sessionRepository;
 
     @Transactional
     public RegistrationResponse registerCourse(Long courseId, String studentEmail, String notes) {
@@ -71,7 +72,7 @@ public class CourseRegistrationService {
         // Thông báo cho gia sư có đơn mới → link đến tab đơn đăng ký
         notificationService.createNotification(course.getTutor().getUser(),
                 "📋 Học viên " + user.getFullName() + " vừa đăng ký khóa học '" + course.getTitle() + "'.",
-                "/tutor");
+                "/tutor?tab=applications");
 
         return mapToResponse(registrationRepository.save(reg));
     }
@@ -117,17 +118,18 @@ public class CourseRegistrationService {
                         registrationRepository.save(r);
                         notificationService.createNotification(r.getStudent().getUser(),
                                 "❌ Đơn đăng ký lớp '" + reg.getCourse().getTitle() + "' đã bị từ chối vì lớp đã có học viên khác.",
-                                "/student");
+                                "/student?tab=courses");
                     });
 
             Payment tuitionFee = Payment.builder()
                     .user(reg.getStudent().getUser())
                     .course(reg.getCourse())
                     .registration(savedRegistration)
+
                     .paymentType("TUITION_FEE")
                     .amount(totalAmount)
                     .status(PaymentStatus.PENDING)
-                    .expiresAt(LocalDateTime.now().plusDays(7))
+                    .expiresAt(LocalDateTime.now().plusHours(24))
                     .build();
             Payment savedPayment = paymentRepository.save(tuitionFee);
 
@@ -135,25 +137,27 @@ public class CourseRegistrationService {
             notificationService.createNotification(reg.getStudent().getUser(),
                     "✅ Đơn đăng ký lớp '" + reg.getCourse().getTitle() + "' đã được duyệt! " +
                     "Vui lòng nộp học phí " + String.format("%,.0f", totalAmount) + "đ trong 24 giờ (Mã HĐ: #" + savedPayment.getId() + ").",
-                    "/student");
+                    "/student?tab=payments");
 
             // Thông báo gia sư → link đến tab đơn đăng ký
             notificationService.createNotification(reg.getCourse().getTutor().getUser(),
                     "Đã duyệt đơn của " + reg.getStudent().getUser().getFullName() +
                     " cho lớp '" + reg.getCourse().getTitle() + "'. Đang chờ học viên thanh toán.",
-                    "/tutor");
+                    "/tutor?tab=applications");
 
         } else if ("REJECTED".equalsIgnoreCase(status)) {
             // Thông báo học viên bị từ chối → link đến tab khóa học
             notificationService.createNotification(reg.getStudent().getUser(),
                     "❌ Đơn đăng ký lớp '" + reg.getCourse().getTitle() + "' đã bị từ chối.",
-                    "/student");
+                    "/student?tab=courses");
         }
 
         return mapToResponse(savedRegistration);
     }
 
     private RegistrationResponse mapToResponse(CourseRegistration reg) {
+        List<CourseSession> sessions = sessionRepository.findByCourseIdOrderBySessionOrderAsc(reg.getCourse().getId());
+        int completed = (int) sessions.stream().filter(CourseSession::isCompleted).count();
         return RegistrationResponse.builder()
                 .id(reg.getId()).courseId(reg.getCourse().getId())
                 .courseTitle(reg.getCourse().getTitle())
@@ -162,6 +166,8 @@ public class CourseRegistrationService {
                 .status(reg.getStatus()).notes(reg.getNotes())
                 .pricePerSession(reg.getCourse().getPricePerSession())
                 .appliedAt(reg.getAppliedAt())
+                .completedSessions(completed)
+                .totalSessions(reg.getCourse().getTotalSessions())
                 .build();
     }
 
@@ -173,12 +179,24 @@ public class CourseRegistrationService {
         boolean isTutor = reg.getCourse().getTutor().getUser().getEmail().equals(email);
         if (!isStudent && !isTutor)
             throw new RuntimeException("Bạn không có quyền xác nhận hoàn thành khóa học này!");
+
+        // Kiểm tra tất cả buổi học đã được gia sư xác nhận hoàn thành chưa
+        List<CourseSession> sessions = sessionRepository.findByCourseIdOrderBySessionOrderAsc(reg.getCourse().getId());
+        if (sessions.isEmpty())
+            throw new RuntimeException("Khóa học chưa có buổi học nào được thiết lập!");
+
+        long completedCount = sessions.stream().filter(CourseSession::isCompleted).count();
+        if (completedCount < sessions.size())
+            throw new RuntimeException(
+                "Chưa thể hoàn thành! Còn " + (sessions.size() - completedCount) +
+                "/" + sessions.size() + " buổi học chưa được xác nhận hoàn thành.");
+
         reg.setStatus("COMPLETED");
 
         // Thông báo học viên có thể đánh giá → link đến tab khóa học
         notificationService.createNotification(reg.getStudent().getUser(),
                 "🎉 Khóa học '" + reg.getCourse().getTitle() + "' đã hoàn thành! Hãy để lại đánh giá cho gia sư.",
-                "/student");
+                "/student?tab=courses");
 
         return mapToResponse(registrationRepository.save(reg));
     }

@@ -190,10 +190,31 @@ export default function ProfilePage() {
                                                     <label>Cấp lớp</label>
                                                     <select value={profile.gradeLevel || ''} onChange={e => set('gradeLevel', e.target.value)}>
                                                         <option value="">-- Chọn --</option>
-                                                        <option value="Lớp 1-5">Lớp 1-5</option>
-                                                        <option value="Lớp 6-9">Lớp 6-9</option>
-                                                        <option value="Lớp 10-12">Lớp 10-12</option>
-                                                        <option value="Đại học">Đại học</option>
+                                                        <optgroup label="Tiểu học">
+                                                            <option value="Lớp 1">Lớp 1</option>
+                                                            <option value="Lớp 2">Lớp 2</option>
+                                                            <option value="Lớp 3">Lớp 3</option>
+                                                            <option value="Lớp 4">Lớp 4</option>
+                                                            <option value="Lớp 5">Lớp 5</option>
+                                                        </optgroup>
+                                                        <optgroup label="THCS">
+                                                            <option value="Lớp 6">Lớp 6</option>
+                                                            <option value="Lớp 7">Lớp 7</option>
+                                                            <option value="Lớp 8">Lớp 8</option>
+                                                            <option value="Lớp 9">Lớp 9</option>
+                                                        </optgroup>
+                                                        <optgroup label="THPT">
+                                                            <option value="Lớp 10">Lớp 10</option>
+                                                            <option value="Lớp 11">Lớp 11</option>
+                                                            <option value="Lớp 12">Lớp 12</option>
+                                                        </optgroup>
+                                                        <optgroup label="Ngoại ngữ">
+                                                            <option value="Tiếng Anh">Tiếng Anh</option>
+                                                            <option value="Tiếng Trung">Tiếng Trung</option>
+                                                            <option value="Tiếng Nhật">Tiếng Nhật</option>
+                                                            <option value="IELTS">IELTS</option>
+                                                            <option value="TOEIC">TOEIC</option>
+                                                        </optgroup>
                                                     </select>
                                                 </div>
                                                 <div className="form-group full-width">
