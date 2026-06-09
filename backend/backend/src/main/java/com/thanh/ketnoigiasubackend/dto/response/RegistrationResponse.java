@@ -12,10 +12,11 @@ public class RegistrationResponse {
     private String courseTitle;
     private String tutorName;
     private String studentName;
+    private String studentAddress; // Địa chỉ học viên — dùng cho bản đồ
     private String status;
     private String notes;
     private Double pricePerSession;
     private LocalDateTime appliedAt;
-    private int completedSessions;  // số buổi đã hoàn thành
-    private int totalSessions;      // tổng số buổi của khóa
+    private int completedSessions;
+    private int totalSessions;
 }

@@ -57,6 +57,11 @@ public class TutorProfile {
     // Ảnh đại diện (lưu đường dẫn file upload)
     private String avatarUrl;
 
+    // Điểm uy tín (0 - 100), mặc định 50 khi mới tạo
+    @Builder.Default
+    @Column(nullable = false)
+    private int reputationScore = 50;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import MapModal from '../components/MapModal';
 import '../css/CourseDetail.css';
 
 /**
@@ -20,6 +21,7 @@ interface Course {
     subjectName: string;
     tutorName: string;
     tutorProfileId: number;
+    tutorAddress: string | null;
     pricePerSession: number;
     totalSessions: number;
     status: string;
@@ -27,6 +29,8 @@ interface Course {
     avgRating: number;
     registrationCount: number;
     promotionExpiration: string | null;
+    schedule: string | null;
+    teachingMode: string;
 }
 
 interface Review {
@@ -49,23 +53,27 @@ export default function CourseDetail() {
     const [loading, setLoading] = useState(true);
     const [registerMsg, setRegisterMsg] = useState('');
     const [registering, setRegistering] = useState(false);
+    const [showMap, setShowMap] = useState(false);
+    const [studentAddress, setStudentAddress] = useState<string>('');
 
     useEffect(() => {
         fetchData();
-    }, [id]);
+        // Lấy địa chỉ học viên để dùng trong bản đồ
+        if (user?.role === 'STUDENT') {
+            api.get('/profile/me').then(res => {
+                if (res.data.address) setStudentAddress(res.data.address);
+            }).catch(console.error);
+        }
+    }, [id, user]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Lấy thông tin khóa học từ public search với id
-            // Vì BE không có GET /public/courses/{id}, dùng getAllCoursesForAdmin hoặc search
-            // Dùng cách: gọi public/courses không filter rồi tìm theo id
-            const [coursesRes, reviewsRes] = await Promise.all([
-                api.get('/public/courses'),
+            const [courseRes, reviewsRes] = await Promise.all([
+                api.get(`/public/courses/${id}`),
                 api.get(`/public/reviews/course/${id}`),
             ]);
-            const found = coursesRes.data.find((c: Course) => c.id === parseInt(id!));
-            setCourse(found || null);
+            setCourse(courseRes.data);
             setReviews(reviewsRes.data || []);
         } catch (e) {
             console.error(e);
@@ -89,6 +97,17 @@ export default function CourseDetail() {
     };
 
     const renderStars = (rating: number) => '★'.repeat(Math.floor(rating)) + '☆'.repeat(5 - Math.floor(rating));
+
+    const DAY_LABELS: Record<string, string> = {
+        MON: 'Thứ 2', TUE: 'Thứ 3', WED: 'Thứ 4',
+        THU: 'Thứ 5', FRI: 'Thứ 6', SAT: 'Thứ 7', SUN: 'Chủ nhật',
+    };
+    const DAY_ORDER = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+
+    const parseSchedule = (raw: string | null) => {
+        if (!raw) return [];
+        try { return JSON.parse(raw); } catch { return []; }
+    };
 
     if (loading) return (
         <div className="dashboard-page">
@@ -200,9 +219,46 @@ export default function CourseDetail() {
                             </div>
                         </div>
 
+                        {/* LỊCH HỌC DỰ KIẾN */}
+                        {(() => {
+                            const slots = parseSchedule(course.schedule);
+                            const sorted = [...slots].sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+                            return (
+                                <div className="cd-section">
+                                    <h2>📅 Lịch học dự kiến</h2>
+                                    {sorted.length === 0 ? (
+                                        <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Gia sư chưa cập nhật lịch dạy.</p>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {sorted.map((slot: any, i: number) => (
+                                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f0f4ff', border: '1.5px solid #c7d2fe', borderRadius: '10px', padding: '10px 16px' }}>
+                                                    <span style={{ fontWeight: 700, color: '#4f46e5', minWidth: '72px', fontSize: '0.92rem' }}>
+                                                        {DAY_LABELS[slot.day] || slot.day}
+                                                    </span>
+                                                    <span style={{ color: '#374151', fontWeight: 600, fontSize: '1rem', letterSpacing: '0.5px' }}>
+                                                        🕐 {slot.startTime} – {slot.endTime}
+                                                    </span>
+                                                    <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#6366f1', background: '#e0e7ff', padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>
+                                                        {(() => {
+                                                            const [sh, sm] = slot.startTime.split(':').map(Number);
+                                                            const [eh, em] = slot.endTime.split(':').map(Number);
+                                                            const mins = (eh * 60 + em) - (sh * 60 + sm);
+                                                            return `${Math.floor(mins / 60)}h${mins % 60 > 0 ? String(mins % 60).padStart(2,'0') + 'p' : ''}`;
+                                                        })()}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>
+                                                * Lịch có thể điều chỉnh theo thỏa thuận giữa gia sư và học viên.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
                         {/* ĐÁNH GIÁ */}
-                        <div className="cd-section">
-                            <h2>⭐ Đánh giá từ học viên ({reviews.length})</h2>
+                        <div className="cd-section">                            <h2>⭐ Đánh giá từ học viên ({reviews.length})</h2>
                             {reviews.length === 0 ? (
                                 <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa có đánh giá nào.</p>
                             ) : (
@@ -282,6 +338,22 @@ export default function CourseDetail() {
                                 <div>🔒 Thanh toán an toàn qua Admin</div>
                                 <div>⭐ Đánh giá thực từ học viên</div>
                             </div>
+
+                            {/* Nút xem bản đồ — chỉ hiện khi offline, gia sư có địa chỉ */}
+                            {(course.teachingMode === 'OFFLINE' || course.teachingMode === 'BOTH') && course.tutorAddress && (
+                                <button
+                                    onClick={() => setShowMap(true)}
+                                    style={{
+                                        width: '100%', marginTop: '10px', padding: '10px',
+                                        background: '#f0fdf4', color: '#059669',
+                                        border: '1.5px solid #bbf7d0', borderRadius: '10px',
+                                        fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                    }}
+                                >
+                                    🗺️ Xem gia sư cách nhà bạn bao xa
+                                </button>
+                            )}
                         </div>
 
                         {/* Thông tin gia sư */}
@@ -304,6 +376,16 @@ export default function CourseDetail() {
             </div>
 
             <Footer />
+            {/* BẢN ĐỒ — gia sư đến nhà học viên */}
+            {showMap && course?.tutorAddress && (
+                <MapModal
+                    studentName={user?.fullName || 'Nhà bạn'}
+                    studentAddress={studentAddress || 'Chưa cập nhật địa chỉ'}
+                    tutorAddress={course.tutorAddress}
+                    onClose={() => setShowMap(false)}
+                />
+            )}
+
         </div>
     );
 }

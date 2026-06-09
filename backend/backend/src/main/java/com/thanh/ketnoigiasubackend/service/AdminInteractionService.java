@@ -21,7 +21,8 @@ public class AdminInteractionService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final CourseRegistrationRepository registrationRepository;
-    private final CourseRepository courseRepository; // Đã thêm repo này để hết lỗi đỏ
+    private final CourseRepository courseRepository;
+    private final ReputationService reputationService;
 
     // --- REPORT ---
     public List<ReportResponse> getAllReports() {
@@ -50,6 +51,9 @@ public class AdminInteractionService {
 
         TutorProfile tutor = report.getRegistration().getCourse().getTutor();
         User tutorUser = tutor.getUser();
+
+        // Trừ điểm uy tín khi vi phạm được xác nhận
+        reputationService.updateOnViolationConfirmed(tutor);
 
         // 1. Khóa tài khoản
         tutorUser.setEnabled(false);

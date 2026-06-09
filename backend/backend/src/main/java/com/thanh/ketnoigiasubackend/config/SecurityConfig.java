@@ -41,6 +41,7 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/error").permitAll()
                         // Cho phép tất cả OPTIONS preflight request
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
@@ -50,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/api/otp/**", "/api/public/**").permitAll()
                         .requestMatchers("/api/payments/vnpay/verify").permitAll()
                         .requestMatchers("/api/admin/payment-info/qr").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/platform-fee").hasRole("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/admin/payment-info").hasRole("ADMIN")
 
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

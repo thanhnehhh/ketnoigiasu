@@ -22,6 +22,8 @@ public class ReviewService {
     private final CourseRegistrationRepository registrationRepository;
     private final NotificationService notificationService;
     private final CourseRepository courseRepository;
+    private final ReputationService reputationService;
+
     @Transactional
     public ReviewResponse postReview(String email, ReviewRequest request) {
         User user = userRepository.findByEmail(email)
@@ -47,6 +49,9 @@ public class ReviewService {
                 .build();
 
         Review saved = reviewRepository.save(review);
+
+        // Cập nhật điểm uy tín theo rating
+        reputationService.updateOnReview(saved.getTutor(), saved.getRating());
 
         notificationService.createNotification(
                 saved.getTutor().getUser(),

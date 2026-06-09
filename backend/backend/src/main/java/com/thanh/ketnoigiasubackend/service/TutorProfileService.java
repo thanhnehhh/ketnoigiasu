@@ -31,6 +31,7 @@ public class TutorProfileService {
                 if (subject == null || subject.isEmpty()) return true;
                 return t.getSubjects() != null && t.getSubjects().contains(subject);
             })
+            .sorted((a, b) -> Integer.compare(b.getReputationScore(), a.getReputationScore())) // Sắp xếp theo điểm uy tín giảm dần
             .map(t -> TutorProfileResponse.builder()
                 .id(t.getId())
                 .fullName(t.getUser().getFullName())
@@ -40,6 +41,9 @@ public class TutorProfileService {
                 .major(t.getMajor())
                 .strengths(t.getStrengths())
                 .address(t.getAddress())
+                .avatarUrl(t.getAvatarUrl())
+                .reputationScore(t.getReputationScore())
+                .reputationLabel(ReputationService.getLabel(t.getReputationScore()))
                 .courses(java.util.List.of())
                 .build())
             .toList();
@@ -82,6 +86,8 @@ public class TutorProfileService {
                 .bio(tutor.getBio())
                 .avatarUrl(tutor.getAvatarUrl())
                 .teachingMode(tutor.getTeachingMode())
+                .reputationScore(tutor.getReputationScore())
+                .reputationLabel(ReputationService.getLabel(tutor.getReputationScore()))
                 .courses(courses)
                 .build();
     }

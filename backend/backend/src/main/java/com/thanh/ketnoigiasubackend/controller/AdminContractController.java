@@ -13,7 +13,8 @@ public class AdminContractController {
     private final ContractService contractService;
 
     @PostMapping("/issue")
-    public ResponseEntity<ContractResponse> issue(@RequestParam Long tutorId, @RequestBody String templateHtml) {
+    public ResponseEntity<ContractResponse> issue(@RequestParam Long tutorId,
+                                                   @RequestBody(required = false) String templateHtml) {
         return ResponseEntity.ok(contractService.issueContract(tutorId, templateHtml));
     }
 

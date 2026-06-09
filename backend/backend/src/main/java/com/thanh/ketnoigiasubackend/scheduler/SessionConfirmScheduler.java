@@ -5,13 +5,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-/**
- * Tự động xác nhận các buổi học mà gia sư đã ghi nhật ký
- * nhưng học viên chưa bấm xác nhận sau 48 giờ.
- *
- * Chạy mỗi giờ để kiểm tra.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

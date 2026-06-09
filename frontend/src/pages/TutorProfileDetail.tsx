@@ -36,6 +36,8 @@ interface TutorProfile {
     bio: string | null;
     avatarUrl: string | null;
     teachingMode: string | null;
+    reputationScore: number;
+    reputationLabel: string;
 }
 
 interface Course {
@@ -129,6 +131,24 @@ export default function TutorProfileDetail() {
                         <div className="tp-verified">
                             <span className="verified-chip">✓ Đã xác minh CCCD</span>
                             <span className="verified-chip">✓ Hợp đồng ký kết</span>
+                            {/* Badge điểm uy tín */}
+                            {profile.reputationScore !== undefined && (() => {
+                                const color = profile.reputationScore >= 85 ? '#10b981'
+                                    : profile.reputationScore >= 70 ? '#3b82f6'
+                                    : profile.reputationScore >= 50 ? '#f59e0b' : '#ef4444';
+                                return (
+                                    <span style={{
+                                        background: color,
+                                        color: 'white',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        padding: '3px 10px',
+                                        borderRadius: '20px',
+                                    }}>
+                                        ⭐ Uy tín: {profile.reputationScore}/100 · {profile.reputationLabel}
+                                    </span>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

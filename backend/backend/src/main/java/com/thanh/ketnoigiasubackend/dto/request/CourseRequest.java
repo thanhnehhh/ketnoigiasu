@@ -11,4 +11,5 @@ public class CourseRequest {
     private Integer totalSessions;
     private Long subjectId;
     private String teachingMode; // ONLINE | OFFLINE | BOTH
+    private String schedule;     // JSON: [{"day":"MON","startTime":"19:00","endTime":"21:00"}]
 }

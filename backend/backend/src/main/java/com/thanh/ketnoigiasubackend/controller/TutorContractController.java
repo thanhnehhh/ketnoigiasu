@@ -34,6 +34,17 @@ public class TutorContractController {
         return ResponseEntity.ok(contractService.getMyContracts(tutor.getId()));
     }
 
+    /** Gia sư yêu cầu Admin cấp hợp đồng — gửi notification cho Admin */
+    @PostMapping("/request")
+    public ResponseEntity<?> requestContract(Authentication auth) {
+        User user = userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        TutorProfile tutor = tutorProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Tutor profile not found"));
+        contractService.requestContractFromAdmin(tutor);
+        return ResponseEntity.ok("Đã gửi yêu cầu cấp hợp đồng đến Admin.");
+    }
+
     @PostMapping("/{id}/sign")
     public ResponseEntity<ContractResponse> sign(@PathVariable Long id, @RequestBody Map<String, String> payload) {
         String base64 = payload.get("signatureBase64");
