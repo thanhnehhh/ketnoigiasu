@@ -24,6 +24,9 @@ interface Session {
     disputeReason: string | null;
     studentConfirmedAt: string | null;
     canStudentConfirm: boolean;
+    // Phí sàn
+    sessionFee: number | null;
+    sessionMode: string | null; // "ONLINE" | "OFFLINE"
 }
 
 interface Material {
@@ -347,6 +350,11 @@ export default function CourseRoom() {
     const totalCount = sessions.length;
     const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+    // Tổng phí sàn tích lũy (chỉ cho tutor)
+    const totalPlatformFee = sessions
+        .filter(s => s.isCompleted && s.sessionFee != null)
+        .reduce((sum, s) => sum + (s.sessionFee ?? 0), 0);
+
     const getFileIcon = (fileType: string) => {
         if (!fileType) return '📄';
         if (fileType.includes('pdf')) return '📕';
@@ -400,6 +408,12 @@ export default function CourseRoom() {
                             <div className="cr-progress-bar">
                                 <div className="cr-progress-fill" style={{ width: `${progressPct}%` }} />
                             </div>
+                            {/* Tổng phí sàn tích lũy — chỉ hiện cho tutor */}
+                            {isTutor && totalPlatformFee > 0 && (
+                                <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#64748b', textAlign: 'right' }}>
+                                    💰 Phí sàn tích lũy: <strong style={{ color: '#ef4444' }}>-{totalPlatformFee.toLocaleString('vi-VN')}đ</strong>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -466,10 +480,22 @@ export default function CourseRoom() {
                                             const isPast = startDate ? now > startDate : false;
 
                                             const getStatus = () => {
-                                                if (s.isCompleted) return { label: '✅ Đã hoàn thành', cls: 'done' };
+                                                if (s.isCompleted && s.studentConfirmed)
+                                                    return { label: '✅ Đã hoàn thành', cls: 'done' };
+                                                if (s.isCompleted && s.studentDisputed)
+                                                    return { label: '⚠️ Đang phản đối', cls: 'confirm' };
+                                                if (s.isCompleted && !s.studentConfirmed) {
+                                                    // Gia sư đã dạy, chờ học viên xác nhận
+                                                    return isTutor
+                                                        ? { label: '⏳ Chờ học viên xác nhận', cls: 'scheduled' }
+                                                        : { label: '📋 Cần xác nhận của bạn', cls: 'confirm' };
+                                                }
                                                 if (!startDate) return { label: '⏳ Chưa lên lịch', cls: 'pending' };
                                                 if (!isPast) return { label: '📅 Sắp diễn ra', cls: 'scheduled' };
-                                                return { label: '🕐 Chưa xác nhận', cls: 'confirm' };
+                                                // Đã qua giờ, gia sư chưa ghi nhật ký
+                                                return isTutor
+                                                    ? { label: '🕐 Cần xác nhận dạy', cls: 'confirm' }
+                                                    : { label: '⌛ Chờ gia sư xác nhận', cls: 'pending' };
                                             };
                                             const status = getStatus();
 
@@ -590,6 +616,30 @@ export default function CourseRoom() {
                                                         {/* Actions cho Tutor */}
                                                         {isTutor && (
                                                             <div className="cr-session-actions">
+                                                                {/* Phí sàn — hiện sau khi buổi hoàn thành */}
+                                                                {s.isCompleted && s.sessionFee != null && (
+                                                                    <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', background: s.sessionMode === 'ONLINE' ? '#eff6ff' : '#f0fdf4', border: `1px solid ${s.sessionMode === 'ONLINE' ? '#bfdbfe' : '#bbf7d0'}`, borderRadius: '8px', padding: '8px 14px', marginBottom: '10px', fontSize: '0.82rem' }}>
+                                                                        <span>{s.sessionMode === 'ONLINE' ? '🌐' : '🏠'}</span>
+                                                                        <span style={{ color: '#374151' }}>
+                                                                            Buổi <strong>{s.sessionMode === 'ONLINE' ? 'Online' : 'Offline'}</strong> — Phí sàn:
+                                                                        </span>
+                                                                        <span style={{ fontWeight: 700, color: s.sessionMode === 'ONLINE' ? '#1d4ed8' : '#15803d', marginLeft: 'auto' }}>
+                                                                            -{s.sessionFee.toLocaleString('vi-VN')}đ
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {s.isCompleted && s.studentFeedback && (                                                                    <div style={{ width: '100%', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 14px', marginBottom: '10px' }}>
+                                                                        <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#065f46', margin: '0 0 4px' }}>
+                                                                            💬 Phản hồi của học viên:
+                                                                        </p>
+                                                                        <p style={{ fontSize: '0.88rem', color: '#374151', margin: 0 }}>{s.studentFeedback}</p>
+                                                                    </div>
+                                                                )}
+                                                                {s.isCompleted && !s.studentFeedback && (
+                                                                    <div style={{ width: '100%', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '8px', padding: '8px 14px', marginBottom: '10px', fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                                                        💬 Học viên chưa gửi phản hồi buổi học này.
+                                                                    </div>
+                                                                )}
                                                                 {(() => {
                                                                     if (s.isCompleted) {
                                                                         // Đã xác nhận → chỉ sửa nhật ký
@@ -811,8 +861,6 @@ export default function CourseRoom() {
                 </div>
             )}
 
-            <Footer />
-
             {/* MODAL PHẢN HỒI BUỔI HỌC (STUDENT) */}
             {feedbackModal.open && feedbackModal.session && (
                 <div className="cr-modal-overlay" onClick={() => setFeedbackModal({ open: false, session: null })}>
@@ -878,6 +926,8 @@ export default function CourseRoom() {
                     </div>
                 </div>
             )}
+
+            <Footer />
         </div>
     );
 }

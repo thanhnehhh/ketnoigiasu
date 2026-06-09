@@ -59,6 +59,7 @@ public class CourseService {
                 .status(CourseStatus.PENDING_APPROVE)
                 .isPromoted(false)
                 .teachingMode(request.getTeachingMode() != null ? request.getTeachingMode() : "BOTH")
+                .schedule(request.getSchedule())
                 .build();
 
         Course savedCourse = courseRepository.save(course);
@@ -69,6 +70,12 @@ public class CourseService {
                 "📚 Gia sư " + user.getFullName() + " vừa tạo khóa học mới '" + savedCourse.getTitle() + "'. Cần duyệt.",
                 "/admin?tab=courses");
         return mapToResponse(savedCourse);
+    }
+
+    public CourseResponse getCourseById(Long id) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy khóa học"));
+        return mapToResponse(course);
     }
 
     public List<CourseResponse> getCoursesByTutorEmail(String email) {
@@ -146,6 +153,7 @@ public class CourseService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khóa học"));
         if (!course.getTutor().getUser().getId().equals(user.getId()))
             throw new RuntimeException("Bạn không có quyền sửa khóa học của người khác!");
+
         if (request.getTitle() != null) course.setTitle(request.getTitle());
         if (request.getDescription() != null) course.setDescription(request.getDescription());
         if (request.getPricePerSession() != null) course.setPricePerSession(request.getPricePerSession());
@@ -156,7 +164,9 @@ public class CourseService {
             course.setSubject(subject);
         }
         if (request.getTeachingMode() != null) course.setTeachingMode(request.getTeachingMode());
-        course.setStatus(CourseStatus.PENDING_APPROVE);
+        if (request.getSchedule() != null) course.setSchedule(request.getSchedule());
+
+        // Giữ nguyên status — không cần Admin duyệt lại khi gia sư sửa thông tin
         return mapToResponse(courseRepository.save(course));
     }
 
@@ -227,12 +237,19 @@ public class CourseService {
     }
 
     private double calculateScore(Course course, Double avgRating, long totalRegistrations) {
-        double ratingScore = (avgRating != null ? avgRating : 0.0) * 150.0;
-        double popularityScore = totalRegistrations * 8.0;
-        long daysSinceCreated = course.getCreatedAt() != null
+        double ratingScore      = (avgRating != null ? avgRating : 0.0) * 150.0;
+        double popularityScore  = totalRegistrations * 8.0;
+        long daysSinceCreated   = course.getCreatedAt() != null
                 ? ChronoUnit.DAYS.between(course.getCreatedAt(), LocalDateTime.now()) : 0;
-        double promotedBonus = course.isPromoted() ? 500.0 : 0.0;
-        return ratingScore + popularityScore - daysSinceCreated * 0.3 + promotedBonus;
+
+        // Đẩy tin: luôn lên đầu (bonus 800 >> mọi yếu tố khác)
+        double promotedBonus = course.isPromoted() ? 800.0 : 0.0;
+
+        // Điểm uy tín gia sư: tầng thứ 2 (max 100 * 4 = 400 — không thắng promoted)
+        int reputationScore = course.getTutor().getReputationScore();
+        double reputationBonus = reputationScore * 4.0;
+
+        return promotedBonus + reputationBonus + ratingScore + popularityScore - daysSinceCreated * 0.3;
     }
 
     private CourseResponse mapToResponse(Course course) {
@@ -248,8 +265,10 @@ public class CourseService {
         return CourseResponse.builder()
                 .id(course.getId()).title(course.getTitle()).description(course.getDescription())
                 .subjectName(course.getSubject() != null ? course.getSubject().getName() : "N/A")
+                .subjectId(course.getSubject() != null ? course.getSubject().getId() : null)
                 .tutorName(course.getTutor().getUser().getFullName())
                 .tutorProfileId(course.getTutor().getId())
+                .tutorAddress(course.getTutor().getAddress())
                 .pricePerSession(course.getPricePerSession()).totalSessions(course.getTotalSessions())
                 .status(course.getStatus().name()).isPromoted(course.isPromoted())
                 .promotionExpiration(course.getPromotionExpiration()).createdAt(course.getCreatedAt())
@@ -258,6 +277,7 @@ public class CourseService {
                 .score(Math.round(score * 10.0) / 10.0)
                 .teachingMode(course.getTeachingMode() != null ? course.getTeachingMode() : "BOTH")
                 .hasApprovedStudent(approvedCount > 0)
+                .schedule(course.getSchedule())
                 .build();
     }
 }

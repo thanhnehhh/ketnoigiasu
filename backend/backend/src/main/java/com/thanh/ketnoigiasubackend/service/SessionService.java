@@ -18,6 +18,8 @@ public class SessionService {
     private final CourseRepository courseRepository;
     private final NotificationService notificationService;
     private final CourseRegistrationRepository courseRegistrationRepository;
+    private final ReputationService reputationService;
+    private final SystemConfigRepository systemConfigRepository;
 
     // Thay thế cho hàm createSession cũ
     @Transactional
@@ -77,6 +79,7 @@ public class SessionService {
         }
 
         // 2. Chặn dạy nhảy buổi — phải hoàn thành buổi trước
+        // "Hoàn thành" = gia sư đã ghi nhật ký (isCompleted=true), không cần chờ học viên xác nhận
         if (currentSession.getSessionOrder() > 1) {
             CourseSession previousSession = sessionRepository
                     .findByCourseIdAndSessionOrder(currentSession.getCourse().getId(), currentSession.getSessionOrder() - 1)
@@ -92,6 +95,24 @@ public class SessionService {
         currentSession.setNotes(notes);
         currentSession.setCompleted(true);
         currentSession.setUpdatedAt(LocalDateTime.now());
+
+        // 4. Xác định hình thức buổi dạy và tính phí sàn
+        boolean isOnline = currentSession.getOnlineLink() != null
+                && !currentSession.getOnlineLink().trim().isEmpty();
+        String mode = isOnline ? "ONLINE" : "OFFLINE";
+        currentSession.setSessionMode(mode);
+
+        double pricePerSession = currentSession.getCourse().getPricePerSession();
+        double feePercent;
+        if (isOnline) {
+            feePercent = Double.parseDouble(
+                systemConfigRepository.findById("fee.online").map(c -> c.getValue()).orElse("15.0"));
+        } else {
+            feePercent = Double.parseDouble(
+                systemConfigRepository.findById("fee.offline").map(c -> c.getValue()).orElse("8.0"));
+        }
+        double fee = Math.round(pricePerSession * feePercent / 100.0 * 100.0) / 100.0;
+        currentSession.setSessionFee(fee);
 
         CourseSession saved = sessionRepository.save(currentSession);
 
@@ -155,6 +176,8 @@ public class SessionService {
                 .disputeReason(s.getDisputeReason())
                 .studentConfirmedAt(s.getStudentConfirmedAt() != null ? s.getStudentConfirmedAt().toString() : null)
                 .canStudentConfirm(canStudentConfirm)
+                .sessionFee(s.getSessionFee())
+                .sessionMode(s.getSessionMode())
                 .build();
     }
 
@@ -250,8 +273,7 @@ public class SessionService {
     @Transactional
     public void autoConfirmExpiredSessions() {
         LocalDateTime deadline = LocalDateTime.now().minusHours(48);
-        List<CourseSession> pending = sessionRepository
-                .findByIsCompletedTrueAndStudentConfirmedFalseAndStudentDisputedFalseAndUpdatedAtBefore(deadline);
+        List<CourseSession> pending = sessionRepository.findExpiredUnconfirmedSessions(deadline);
 
         for (CourseSession s : pending) {
             s.setStudentConfirmed(true);
@@ -299,6 +321,9 @@ public class SessionService {
     }
 
     private void doCompleteCourse(Course course) {
+        // Cộng điểm uy tín khi khóa học hoàn thành
+        reputationService.updateOnCourseCompleted(course.getTutor());
+
         course.getRegistrations().stream()
                 .filter(reg -> "ACTIVE".equals(reg.getStatus()))
                 .forEach(reg -> {

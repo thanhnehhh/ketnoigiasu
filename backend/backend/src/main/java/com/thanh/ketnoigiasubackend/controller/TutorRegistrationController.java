@@ -35,8 +35,8 @@ public class TutorRegistrationController {
     public ResponseEntity<?> reviewApplication(
             @PathVariable Long id,
             @RequestParam String status,
+            @RequestParam(required = false) String reason,
             Authentication auth) {
-        // Service.updateStatus giờ cũng trả về RegistrationResponse
-        return ResponseEntity.ok(registrationService.updateStatus(id, status, auth.getName()));
+        return ResponseEntity.ok(registrationService.updateStatus(id, status, auth.getName(), reason));
     }
 }

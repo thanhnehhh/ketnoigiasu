@@ -14,8 +14,9 @@ interface Complaint { id: number; tutorName: string; reviewId: number; reason: s
 interface Contract { id: number; tutorId: number; tutorName: string; tutorEmail: string; contentSnapshot: string; status: string; signedAt: string | null; createdAt: string; }
 interface RefundRequest { id: number; paymentId: number; courseTitle: string; amount: number; studentName: string; reason: string; evidenceUrl: string; status: string; adminNote: string | null; createdAt: string; }
 interface FinanceSummary { totalTuition: number; totalPlatformFee: number; totalPromote: number; platformPercentFee: number; totalRevenue: number; pendingPaymentCount: number; activeStudents: number; activeTutors: number; }
+interface AdminUser { id: number; email: string; fullName: string; role: string; phone: string; enabled: boolean; createdAt: string; }
 
-type AdminTab = 'overview' | 'courses' | 'payments' | 'finance' | 'reports' | 'complaints' | 'contracts';
+type AdminTab = 'overview' | 'courses' | 'payments' | 'finance' | 'reports' | 'complaints' | 'contracts' | 'users';
 
 // ===== STAT CARD COMPONENT =====
 function StatCard({ icon, label, value, sub, color, onClick }: { icon: string; label: string; value: string | number; sub?: string; color: string; onClick?: () => void }) {
@@ -73,6 +74,7 @@ export default function AdminDashboard() {
     // Modal phát hành hợp đồng
     const [issueModal, setIssueModal] = useState(false);
     const [issueTutorId, setIssueTutorId] = useState('');
+    const [tutorList, setTutorList] = useState<{ id: number; fullName: string; email: string }[]>([]);
     const [issueTemplate, setIssueTemplate] = useState(
         `<h2>HỢP ĐỒNG GIA SƯ</h2>
 <p>Hôm nay, chúng tôi ký kết hợp đồng với gia sư:</p>
@@ -101,6 +103,10 @@ export default function AdminDashboard() {
     const [vietQRMsg, setVietQRMsg] = useState('');
     const [vietQRPreview, setVietQRPreview] = useState<string>('');
 
+    // Cài đặt phí sàn Online/Offline
+    const [feeConfig, setFeeConfig] = useState({ onlineFeePercent: 15, offlineFeePercent: 8 });
+    const [feeMsg, setFeeMsg] = useState('');
+
     // Filter states
     const [courseFilter, setCourseFilter]       = useState<'ALL'|'PENDING_APPROVE'|'APPROVED'|'REJECTED'|'HIDDEN'>('ALL');
     const [payFilter, setPayFilter]             = useState<'ALL'|'PLATFORM_FEE'|'PROMOTE'|'TUITION_FEE'>('ALL');
@@ -115,18 +121,27 @@ export default function AdminDashboard() {
     const [seenReportF,    setSeenReportF]    = useState(new Set(['ALL']));
     const [seenComplaintF, setSeenComplaintF] = useState(new Set(['ALL']));
 
+    // Quản lý người dùng
+    const [users, setUsers] = useState<AdminUser[]>([]);
+    const [userRoleFilter, setUserRoleFilter] = useState<'ALL'|'STUDENT'|'TUTOR'>('ALL');
+    const [userKeyword, setUserKeyword] = useState('');
+    const [togglingUser, setTogglingUser] = useState<number | null>(null);
+
     useEffect(() => {
         fetchAll();
         api.get('/public/payment-info').then(res => {
             setVietQRConfig({ bankName: res.data.bankName || '', bankAccount: res.data.bankAccount || '', bankOwner: res.data.bankOwner || '' });
             if (res.data.qrImageUrl) setVietQRPreview(res.data.qrImageUrl);
         }).catch(console.error);
+        api.get('/public/platform-fee').then(res => {
+            setFeeConfig({ onlineFeePercent: res.data.onlineFeePercent, offlineFeePercent: res.data.offlineFeePercent });
+        }).catch(console.error);
     }, []);
 
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [cRes, pRes, rRes, cmpRes, conRes, refundRes, finRes, transferRes, histRes] = await Promise.all([
+            const [cRes, pRes, rRes, cmpRes, conRes, refundRes, finRes, transferRes, histRes, userRes] = await Promise.all([
                 api.get('/admin/courses'),
                 api.get('/admin/payments/pending'),
                 api.get('/admin/interactions/reports'),
@@ -136,6 +151,7 @@ export default function AdminDashboard() {
                 api.get('/admin/payments/finance-summary'),
                 api.get('/admin/payments/pending-transfer'),
                 api.get('/admin/payments/transfer-history'),
+                api.get('/admin/users'),
             ]);
             setCourses(cRes.data);
             setPayments(pRes.data);
@@ -147,6 +163,7 @@ export default function AdminDashboard() {
             setPendingTransfers(transferRes.data);
             setTransferHistory(histRes.data);
             setAllPayments(pRes.data);
+            setUsers(userRes.data);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     };
@@ -154,6 +171,27 @@ export default function AdminDashboard() {
     const flash = (text: string, err = false) => {
         setMsg(text); setIsErr(err);
         setTimeout(() => setMsg(''), 3000);
+    };
+
+    const fetchUsers = async (role = userRoleFilter, kw = userKeyword) => {
+        try {
+            const params: any = {};
+            if (role !== 'ALL') params.role = role;
+            if (kw.trim()) params.keyword = kw;
+            const res = await api.get('/admin/users', { params });
+            setUsers(res.data);
+        } catch (e) { console.error(e); }
+    };
+
+    const toggleUserStatus = async (userId: number) => {
+        setTogglingUser(userId);
+        try {
+            const res = await api.put(`/admin/users/${userId}/toggle-status`);
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, enabled: res.data.enabled } : u));
+            toast.success(res.data.message);
+        } catch (e: any) {
+            toast.error(e.response?.data?.message || 'Lỗi');
+        } finally { setTogglingUser(null); }
     };
 
     const saveVietQR = async () => {
@@ -170,6 +208,16 @@ export default function AdminDashboard() {
             setTimeout(() => setVietQRMsg(''), 3000);
         } catch (e: any) {
             setVietQRMsg('❌ ' + (e.response?.data?.message || 'Lỗi lưu'));
+        }
+    };
+
+    const saveFeeConfig = async () => {
+        try {
+            await api.put('/admin/platform-fee', feeConfig);
+            setFeeMsg('✅ Đã lưu tỉ lệ phí sàn!');
+            setTimeout(() => setFeeMsg(''), 3000);
+        } catch (e: any) {
+            setFeeMsg('❌ ' + (e.response?.data?.message || 'Lỗi lưu'));
         }
     };
 
@@ -248,10 +296,9 @@ export default function AdminDashboard() {
     };
     // Contracts
     const issueContract = async () => {
-        if (!issueTutorId.trim()) { setIssueMsg('Vui lòng nhập Tutor Profile ID'); return; }
+        if (!issueTutorId.trim()) { setIssueMsg('Vui lòng chọn gia sư'); return; }
         try {
-            // POST /api/admin/contracts/issue?tutorId= body: HTML string
-            await api.post(`/admin/contracts/issue`, issueTemplate, {
+            await api.post(`/admin/contracts/issue`, '', {
                 params: { tutorId: parseInt(issueTutorId) },
                 headers: { 'Content-Type': 'text/plain' },
             });
@@ -354,6 +401,9 @@ export default function AdminDashboard() {
                             📣 Khiếu nại review
                             {complaints.filter(c => c.status === 'PENDING').length > 0 && <span className="badge">{complaints.filter(c => c.status === 'PENDING').length}</span>}
                         </button>
+                        <button className={tab === 'users' ? 'active' : ''} onClick={() => { setTab('users'); fetchUsers('ALL', ''); setUserRoleFilter('ALL'); setUserKeyword(''); }}>
+                            👥 Quản lý người dùng
+                        </button>
                         <button className="logout-btn" onClick={logout}>🚪 Đăng xuất</button>
                     </nav>
                     {pendingCount > 0 && (
@@ -426,6 +476,12 @@ export default function AdminDashboard() {
                                             <StatCard icon="🙈" label="Khóa học bị ẩn" value={hiddenCourses}
                                                 sub="Do vi phạm chính sách" color="#f3f4f6"
                                                 onClick={() => setTab('courses')} />
+                                            <StatCard icon="👥" label="Người dùng" value={users.length}
+                                                sub={`${users.filter(u => u.role === 'STUDENT').length} học viên · ${users.filter(u => u.role === 'TUTOR').length} gia sư`} color="#e0f2fe"
+                                                onClick={() => { setTab('users'); fetchUsers('ALL', ''); }} />
+                                            <StatCard icon="🔒" label="Tài khoản bị khóa" value={users.filter(u => !u.enabled).length}
+                                                sub="Nhấn để xem danh sách" color="#fee2e2"
+                                                onClick={() => { setTab('users'); fetchUsers('ALL', ''); }} />
                                         </div>
 
                                         {/* VIỆC CẦN LÀM NGAY */}
@@ -762,6 +818,53 @@ export default function AdminDashboard() {
                                         </button>
                                     </div>
 
+                                    {/* Cài đặt phí sàn Online/Offline */}
+                                    <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '14px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                                        <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 700, color: '#1f2937' }}>
+                                            💰 Tỉ lệ phí sàn theo hình thức dạy
+                                        </h3>
+                                        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
+                                            Phí được tính tự động khi gia sư xác nhận hoàn thành buổi dạy. Buổi Offline thấp hơn để hỗ trợ tiền xăng xe gia sư.
+                                        </p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1rem' }}>
+                                            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '14px' }}>
+                                                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d4ed8', display: 'block', marginBottom: '8px' }}>
+                                                    🌐 Buổi Online (%)
+                                                </label>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <input
+                                                        type="number" min={0} max={100} step={0.5}
+                                                        value={feeConfig.onlineFeePercent}
+                                                        onChange={e => setFeeConfig(p => ({ ...p, onlineFeePercent: parseFloat(e.target.value) }))}
+                                                        style={{ width: '80px', border: '1.5px solid #bfdbfe', borderRadius: '8px', padding: '8px', fontSize: '1.1rem', fontWeight: 700, textAlign: 'center' }}
+                                                    />
+                                                    <span style={{ fontWeight: 700, color: '#1d4ed8', fontSize: '1.1rem' }}>%</span>
+                                                </div>
+                                            </div>
+                                            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px', padding: '14px' }}>
+                                                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#15803d', display: 'block', marginBottom: '8px' }}>
+                                                    🏠 Buổi Offline (%)
+                                                </label>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <input
+                                                        type="number" min={0} max={100} step={0.5}
+                                                        value={feeConfig.offlineFeePercent}
+                                                        onChange={e => setFeeConfig(p => ({ ...p, offlineFeePercent: parseFloat(e.target.value) }))}
+                                                        style={{ width: '80px', border: '1.5px solid #bbf7d0', borderRadius: '8px', padding: '8px', fontSize: '1.1rem', fontWeight: 700, textAlign: 'center' }}
+                                                    />
+                                                    <span style={{ fontWeight: 700, color: '#15803d', fontSize: '1.1rem' }}>%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 14px', marginBottom: '1rem', fontSize: '0.82rem', color: '#92400e' }}>
+                                            💡 Ví dụ: giá 300.000đ/buổi → Online thu <strong>{Math.round(300000 * feeConfig.onlineFeePercent / 100).toLocaleString('vi-VN')}đ</strong> / Offline thu <strong>{Math.round(300000 * feeConfig.offlineFeePercent / 100).toLocaleString('vi-VN')}đ</strong>
+                                        </div>
+                                        {feeMsg && <p style={{ color: feeMsg.startsWith('✅') ? '#10b981' : '#ef4444', fontSize: '0.88rem', marginBottom: '8px' }}>{feeMsg}</p>}
+                                        <button className="btn-primary" onClick={saveFeeConfig} style={{ padding: '10px 24px' }}>
+                                            💾 Lưu tỉ lệ phí sàn
+                                        </button>
+                                    </div>
+
                                     {/* Sub-tab finance */}
                                     <div className="course-filter-bar" style={{ marginBottom: '1.5rem' }}>
                                         {([
@@ -897,7 +1000,13 @@ export default function AdminDashboard() {
                             {tab === 'contracts' && (                                <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                         <h2 className="dash-title" style={{ margin: 0 }}>Quản lý hợp đồng</h2>
-                                        <button className="btn-primary" onClick={() => { setIssueModal(true); setIssueMsg(''); setIssueTutorId(''); }}>
+                                        <button className="btn-primary" onClick={() => {
+                                            setIssueModal(true);
+                                            setIssueMsg('');
+                                            setIssueTutorId('');
+                                            // Load danh sách gia sư
+                                            api.get('/tutor-profiles').then(res => setTutorList(res.data)).catch(console.error);
+                                        }}>
                                             + Phát hành hợp đồng
                                         </button>
                                     </div>
@@ -1061,6 +1170,131 @@ export default function AdminDashboard() {
                                     )}
                                 </div>
                             )}
+
+                            {/* QUẢN LÝ NGƯỜI DÙNG */}
+                            {tab === 'users' && (
+                                <div>
+                                    <h2 className="dash-title">Quản lý người dùng</h2>
+
+                                    {/* Tìm kiếm + filter */}
+                                    <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+                                            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '1rem' }}>🔍</span>
+                                            <input
+                                                type="text"
+                                                placeholder="Tìm theo tên hoặc email..."
+                                                value={userKeyword}
+                                                onChange={e => { setUserKeyword(e.target.value); fetchUsers(userRoleFilter, e.target.value); }}
+                                                style={{ width: '100%', padding: '10px 14px 10px 36px', border: '1.5px solid #e2e8f0', borderRadius: '12px', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box', background: 'white' }}
+                                            />
+                                        </div>
+                                        {([
+                                            { key: 'ALL', label: 'Tất cả', color: '#64748b', count: users.length },
+                                            { key: 'STUDENT', label: '🎓 Học viên', color: '#6366f1', count: users.filter(u => u.role === 'STUDENT').length },
+                                            { key: 'TUTOR', label: '👨‍🏫 Gia sư', color: '#0ea5e9', count: users.filter(u => u.role === 'TUTOR').length },
+                                        ] as const).map(f => (
+                                            <button key={f.key}
+                                                className={`course-filter-btn ${userRoleFilter === f.key ? 'active' : ''}`}
+                                                style={{ '--filter-color': f.color } as any}
+                                                onClick={() => { setUserRoleFilter(f.key); fetchUsers(f.key, userKeyword); }}>
+                                                {f.label}
+                                                <span className="course-filter-count">{f.count}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Thống kê nhanh */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '1.5rem' }}>
+                                        {[
+                                            { label: 'Tổng người dùng', value: users.length, icon: '👥', bg: '#f0f9ff', color: '#0369a1' },
+                                            { label: 'Đang hoạt động', value: users.filter(u => u.enabled).length, icon: '✅', bg: '#f0fdf4', color: '#15803d' },
+                                            { label: 'Bị khóa', value: users.filter(u => !u.enabled).length, icon: '🔒', bg: '#fef2f2', color: '#b91c1c' },
+                                        ].map(s => (
+                                            <div key={s.label} style={{ background: s.bg, borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <span style={{ fontSize: '1.5rem' }}>{s.icon}</span>
+                                                <div>
+                                                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: s.color }}>{s.value}</div>
+                                                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{s.label}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Danh sách user dạng card */}
+                                    {users.filter(u => userRoleFilter === 'ALL' || u.role === userRoleFilter).length === 0 ? (
+                                        <div className="empty-state"><p>Không có người dùng nào.</p></div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            {users
+                                                .filter(u => userRoleFilter === 'ALL' || u.role === userRoleFilter)
+                                                .map(u => (
+                                                <div key={u.id} style={{
+                                                    background: 'white', borderRadius: '14px', padding: '14px 18px',
+                                                    border: `1.5px solid ${u.enabled ? '#f1f5f9' : '#fecaca'}`,
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                                    display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap',
+                                                    opacity: u.enabled ? 1 : 0.75,
+                                                }}>
+                                                    {/* Avatar */}
+                                                    <div style={{
+                                                        width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                                                        background: u.role === 'STUDENT' ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : u.role === 'TUTOR' ? 'linear-gradient(135deg,#0ea5e9,#6366f1)' : 'linear-gradient(135deg,#ef4444,#f97316)',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        color: 'white', fontWeight: 700, fontSize: '1.1rem',
+                                                    }}>
+                                                        {u.fullName?.charAt(0) || '?'}
+                                                    </div>
+
+                                                    {/* Thông tin chính */}
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                            <span style={{ fontWeight: 700, color: '#1f2937', fontSize: '0.95rem' }}>{u.fullName}</span>
+                                                            <span style={{
+                                                                background: u.role === 'STUDENT' ? '#ede9fe' : u.role === 'TUTOR' ? '#e0f2fe' : '#fee2e2',
+                                                                color: u.role === 'STUDENT' ? '#6d28d9' : u.role === 'TUTOR' ? '#0369a1' : '#b91c1c',
+                                                                padding: '1px 8px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700,
+                                                            }}>
+                                                                {u.role === 'STUDENT' ? '🎓 Học viên' : u.role === 'TUTOR' ? '👨‍🏫 Gia sư' : '⚙️ Admin'}
+                                                            </span>
+                                                            {!u.enabled && (
+                                                                <span style={{ background: '#fee2e2', color: '#b91c1c', padding: '1px 8px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                                                    🔒 Bị khóa
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                                                            📧 {u.email}
+                                                            {u.phone && <span style={{ marginLeft: '12px' }}>📞 {u.phone}</span>}
+                                                            <span style={{ marginLeft: '12px', color: '#94a3b8' }}>
+                                                                Tham gia {u.createdAt ? new Date(u.createdAt).toLocaleDateString('vi-VN') : '—'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Hành động */}
+                                                    {u.role !== 'ADMIN' && (
+                                                        <button
+                                                            disabled={togglingUser === u.id}
+                                                            onClick={() => toggleUserStatus(u.id)}
+                                                            style={{
+                                                                padding: '7px 16px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                                                fontWeight: 600, fontSize: '0.82rem', transition: 'all 0.15s', flexShrink: 0,
+                                                                background: u.enabled ? '#fee2e2' : '#d1fae5',
+                                                                color: u.enabled ? '#b91c1c' : '#065f46',
+                                                            }}
+                                                        >
+                                                            {togglingUser === u.id ? '⏳' : u.enabled ? '🔒 Khóa TK' : '🔓 Mở khóa'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '10px', textAlign: 'right' }}>
+                                        Hiển thị {users.filter(u => userRoleFilter === 'ALL' || u.role === userRoleFilter).length} / {users.length} người dùng
+                                    </p>
+                                </div>
+                            )}
                         </>
                     )}
                 </main>
@@ -1144,23 +1378,38 @@ export default function AdminDashboard() {
             {/* MODAL PHÁT HÀNH HỢP ĐỒNG */}
             {issueModal && (
                 <div className="modal-overlay" onClick={() => setIssueModal(false)}>
-                    <div className="modal-box" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+                    <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
                         <h3>📄 Phát hành hợp đồng cho gia sư</h3>
                         <div className="modal-form">
-                            <label>Tutor Profile ID *</label>
-                            <input className="modal-input" type="number" value={issueTutorId}
+                            <label>Chọn gia sư *</label>
+                            {/* Search + dropdown gia sư */}
+                            <select
+                                className="modal-input"
+                                value={issueTutorId}
                                 onChange={e => setIssueTutorId(e.target.value)}
-                                placeholder="Nhập ID profile gia sư (xem trong DB hoặc URL)" />
-                            <label>Nội dung hợp đồng (HTML) *</label>
-                            <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '6px' }}>
-                                Dùng placeholder: <code>{'{{TEN_GIA_SU}}'}</code>, <code>{'{{EMAIL}}'}</code>, <code>{'{{NGAY_TAO}}'}</code>, <code>{'{{CHU_KY}}'}</code>
+                                style={{ fontSize: '0.92rem' }}
+                            >
+                                <option value="">-- Chọn gia sư --</option>
+                                {tutorList.map(t => (
+                                    <option key={t.id} value={String(t.id)}>
+                                        {t.fullName} — {t.email}
+                                    </option>
+                                ))}
+                            </select>
+                            {tutorList.length === 0 && (
+                                <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>
+                                    ⏳ Đang tải danh sách gia sư...
+                                </p>
+                            )}
+                            <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px' }}>
+                                💡 Hợp đồng sẽ tự động điền tên, email, ngày ký và % phí sàn hiện tại.
                             </p>
-                            <textarea className="modal-input" rows={10} value={issueTemplate}
-                                onChange={e => setIssueTemplate(e.target.value)} style={{ fontFamily: 'monospace', fontSize: '0.82rem' }} />
                         </div>
                         {issueMsg && <p style={{ color: issueMsg.startsWith('✅') ? '#10b981' : '#ef4444', marginTop: '8px' }}>{issueMsg}</p>}
                         <div className="modal-actions">
-                            <button className="btn-primary" onClick={issueContract}>📤 Phát hành</button>
+                            <button className="btn-primary" onClick={issueContract} disabled={!issueTutorId}>
+                                📤 Phát hành hợp đồng
+                            </button>
                             <button className="btn-outline" onClick={() => setIssueModal(false)}>Hủy</button>
                         </div>
                     </div>

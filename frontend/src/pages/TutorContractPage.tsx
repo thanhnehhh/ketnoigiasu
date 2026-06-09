@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../css/Dashboard.css';
@@ -41,12 +42,27 @@ export default function TutorContractPage() {
     const [viewModal, setViewModal] = useState<{ open: boolean; contract: Contract | null }>({ open: false, contract: null });
     const [signing, setSigning] = useState(false);
 
-    // Canvas vẽ chữ ký
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [hasSig, setHasSig] = useState(false);
+    // Upload ảnh chữ ký đã tách nền
+    const [sigFile, setSigFile] = useState<File | null>(null);
+    const [sigPreview, setSigPreview] = useState<string | null>(null);
 
-    useEffect(() => { fetchContracts(); }, []);
+    // Yêu cầu hợp đồng
+    const [requesting, setRequesting] = useState(false);
+    const [requested, setRequested] = useState(false);
+
+    // Modal QR đóng phí sàn
+    const [feeModal, setFeeModal] = useState(false);
+    const [adminPayInfo, setAdminPayInfo] = useState<{ bankName: string; bankAccount: string; bankOwner: string; qrImageUrl: string } | null>(null);
+    const [feeProofFile, setFeeProofFile] = useState<File | null>(null);
+    const [feeProofMsg, setFeeProofMsg] = useState('');
+    const [submittingFee, setSubmittingFee] = useState(false);
+
+    const { user } = useAuth();
+
+    useEffect(() => {
+        fetchContracts();
+        api.get('/public/payment-info').then(res => setAdminPayInfo(res.data)).catch(console.error);
+    }, []);
 
     const fetchContracts = async () => {
         setLoading(true);
@@ -90,15 +106,75 @@ export default function TutorContractPage() {
         setHasSig(false);
     };
 
+    // Xử lý upload ảnh chữ ký đã tách nền — nén xuống trước khi gửi
+    const handleSigUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setSigFile(file);
+
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            // Giữ nguyên tỉ lệ, chỉ scale down nếu quá lớn
+            const MAX_W = 500;
+            const ratio = Math.min(1, MAX_W / img.width);
+            canvas.width  = Math.round(img.width  * ratio);
+            canvas.height = Math.round(img.height * ratio);
+            const ctx = canvas.getContext('2d')!;
+            // KHÔNG fill background — giữ trong suốt để chữ ký hiện đúng
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const compressed = canvas.toDataURL('image/png');
+            setSigPreview(compressed);
+            setHasSig(true);
+            URL.revokeObjectURL(url);
+        };
+        img.src = url;
+    };
+
+    const clearSig = () => {
+        setSigFile(null);
+        setSigPreview(null);
+        setHasSig(false);
+    };
+
+    // Yêu cầu Admin cấp hợp đồng
+    const requestContract = async () => {
+        setRequesting(true);
+        try {
+            await api.post('/tutor/contracts/request');
+            setRequested(true);
+            flash('✅ Đã gửi yêu cầu! Admin sẽ cấp hợp đồng cho bạn sớm.');
+        } catch (e: any) {
+            flash('❌ ' + (e.response?.data?.message || 'Lỗi gửi yêu cầu'), true);
+        } finally { setRequesting(false); }
+    };
+
+    // Nộp minh chứng đóng phí sàn
+    const submitFeeProof = async () => {
+        if (!feeProofFile) { setFeeProofMsg('Vui lòng chọn ảnh minh chứng'); return; }
+        setSubmittingFee(true);
+        try {
+            const formData = new FormData();
+            formData.append('proof', feeProofFile);
+            await api.post('/payments/platform-fee', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setFeeProofMsg('✅ Đã nộp minh chứng! Admin sẽ xác nhận sớm.');
+            setFeeProofFile(null);
+        } catch (e: any) {
+            setFeeProofMsg('❌ ' + (e.response?.data?.message || 'Lỗi nộp minh chứng'));
+        } finally { setSubmittingFee(false); }
+    };
+
     const signContract = async () => {
-        if (!hasSig) { flash('Vui lòng ký tên trước!', true); return; }
-        const canvas = canvasRef.current; if (!canvas) return;
-        const base64 = canvas.toDataURL('image/png');
+        if (!sigPreview) { flash('Vui lòng upload ảnh chữ ký trước!', true); return; }
         setSigning(true);
         try {
-            await api.post(`/tutor/contracts/${viewModal.contract!.id}/sign`, { signatureBase64: base64 });
+            await api.post(`/tutor/contracts/${viewModal.contract!.id}/sign`, { signatureBase64: sigPreview });
             flash('✅ Ký hợp đồng thành công!');
             setViewModal({ open: false, contract: null });
+            clearSig();
             fetchContracts();
         } catch (e: any) {
             flash('❌ ' + (e.response?.data?.message || 'Lỗi ký hợp đồng'), true);
@@ -151,41 +227,76 @@ export default function TutorContractPage() {
                     {loading ? <div className="loading-spinner">Đang tải...</div> : (
                         contracts.length === 0 ? (
                             <div className="empty-state">
-                                <p>Chưa có hợp đồng nào. Vui lòng liên hệ Admin để được cấp hợp đồng.</p>
+                                <p style={{ fontSize: '1rem', color: '#374151', marginBottom: '0.5rem' }}>
+                                    Bạn chưa có hợp đồng nào.
+                                </p>
+                                <p style={{ fontSize: '0.88rem', color: '#94a3b8', marginBottom: '1.5rem' }}>
+                                    Bấm nút bên dưới để gửi yêu cầu — Admin sẽ cấp hợp đồng cho bạn trong thời gian sớm nhất.
+                                </p>
+                                {requested ? (
+                                    <div style={{ background: '#d1fae5', color: '#065f46', padding: '12px 20px', borderRadius: '10px', fontSize: '0.92rem', fontWeight: 600 }}>
+                                        ✅ Đã gửi yêu cầu! Vui lòng chờ Admin xét duyệt.
+                                    </div>
+                                ) : (
+                                    <button className="btn-primary" onClick={requestContract} disabled={requesting}>
+                                        {requesting ? '⏳ Đang gửi...' : '📩 Yêu cầu cấp hợp đồng'}
+                                    </button>
+                                )}
                             </div>
                         ) : (
-                            <div className="card-list">
-                                {contracts.map(c => {
-                                    const s = STATUS_MAP[c.status] || { label: c.status, color: '#64748b' };
-                                    return (
-                                        <div key={c.id} className="reg-card">
-                                            <div className="reg-card-header">
-                                                <h3>📄 Hợp đồng #{c.id}</h3>
-                                                <span className="status-badge" style={{ background: s.color }}>{s.label}</span>
-                                            </div>
-                                            <p>📅 Ngày cấp: {new Date(c.createdAt).toLocaleDateString('vi-VN')}</p>
-                                            {c.signedAt && <p>✅ Ngày ký: {new Date(c.signedAt).toLocaleDateString('vi-VN')}</p>}
-                                            <div className="reg-actions">
-                                                <button className="btn-sm btn-outline"
-                                                    onClick={() => { setViewModal({ open: true, contract: c }); setHasSig(false); }}>
-                                                    👁️ Xem hợp đồng
-                                                </button>
-                                                {c.status === 'PENDING' && (
-                                                    <button className="btn-sm btn-primary"
-                                                        onClick={() => { setViewModal({ open: true, contract: c }); setHasSig(false); }}>
-                                                        ✍️ Ký hợp đồng
-                                                    </button>
-                                                )}
-                                                {c.status === 'SIGNED' && (
-                                                    <button className="btn-sm btn-primary" onClick={() => downloadPdf(c.id)}>
-                                                        📥 Tải PDF
-                                                    </button>
-                                                )}
-                                            </div>
+                            <>
+                                {/* Nút đóng phí sàn — hiện khi đã có hợp đồng đã ký */}
+                                {contracts.some(c => c.status === 'SIGNED') && (
+                                    <div style={{ background: '#fffbeb', border: '1.5px solid #fbbf24', borderRadius: '14px', padding: '1rem 1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                                        <div>
+                                            <p style={{ fontWeight: 700, color: '#92400e', margin: '0 0 4px', fontSize: '0.95rem' }}>
+                                                💵 Đóng phí sàn để bắt đầu tạo khóa học
+                                            </p>
+                                            <p style={{ fontSize: '0.82rem', color: '#b45309', margin: 0 }}>
+                                                Phí sàn <strong>200.000đ</strong> — nộp một lần để kích hoạt tài khoản gia sư
+                                            </p>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                        <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#f59e0b,#f97316)' }}
+                                            onClick={() => { setFeeModal(true); setFeeProofMsg(''); }}>
+                                            💳 Đóng phí sàn ngay
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Danh sách hợp đồng */}
+                                <div className="card-list">
+                                    {contracts.map(c => {
+                                        const s = STATUS_MAP[c.status] || { label: c.status, color: '#64748b' };
+                                        return (
+                                            <div key={c.id} className="reg-card">
+                                                <div className="reg-card-header">
+                                                    <h3>📄 Hợp đồng #{c.id}</h3>
+                                                    <span className="status-badge" style={{ background: s.color }}>{s.label}</span>
+                                                </div>
+                                                <p>📅 Ngày cấp: {new Date(c.createdAt).toLocaleDateString('vi-VN')}</p>
+                                                {c.signedAt && <p>✅ Ngày ký: {new Date(c.signedAt).toLocaleDateString('vi-VN')}</p>}
+                                                <div className="reg-actions">
+                                                    <button className="btn-sm btn-outline"
+                                                        onClick={() => { setViewModal({ open: true, contract: c }); setSigPreview(null); }}>
+                                                        👁️ Xem hợp đồng
+                                                    </button>
+                                                    {c.status === 'PENDING' && (
+                                                        <button className="btn-sm btn-primary"
+                                                            onClick={() => { setViewModal({ open: true, contract: c }); setSigPreview(null); }}>
+                                                            ✍️ Ký hợp đồng
+                                                        </button>
+                                                    )}
+                                                    {c.status === 'SIGNED' && (
+                                                        <button className="btn-sm btn-primary" onClick={() => downloadPdf(c.id)}>
+                                                            📥 Tải PDF
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
                         )
                     )}
                 </main>
@@ -210,29 +321,59 @@ export default function TutorContractPage() {
                         {/* Khu vực ký tên — chỉ hiện khi PENDING */}
                         {viewModal.contract.status === 'PENDING' && (
                             <div>
-                                <p style={{ fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                    ✍️ Ký tên của bạn vào ô bên dưới:
-                                </p>
-                                <canvas
-                                    ref={canvasRef}
-                                    width={600} height={150}
-                                    style={{
-                                        border: '2px dashed #4f46e5', borderRadius: '10px',
-                                        cursor: 'crosshair', background: 'white', width: '100%', display: 'block'
-                                    }}
-                                    onMouseDown={startDraw}
-                                    onMouseMove={draw}
-                                    onMouseUp={stopDraw}
-                                    onMouseLeave={stopDraw}
-                                />
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', marginBottom: '1rem' }}>
-                                    <button className="btn-sm btn-outline" onClick={clearCanvas}>🗑️ Xóa chữ ký</button>
+                                {/* Hướng dẫn tách nền chữ ký */}
+                                <div style={{ background: '#fffbeb', border: '1.5px solid #fbbf24', borderRadius: '10px', padding: '12px 16px', marginBottom: '1.25rem' }}>
+                                    <p style={{ fontWeight: 700, color: '#92400e', margin: '0 0 6px', fontSize: '0.9rem' }}>
+                                        ✍️ CHỮ KÝ CỦA BẠN
+                                    </p>
+                                    <p style={{ color: '#b45309', fontSize: '0.85rem', margin: 0 }}>
+                                        Bạn vui lòng nhấn{' '}
+                                        <a href="https://www.remove.bg/vi/upload" target="_blank" rel="noopener noreferrer"
+                                            style={{ color: '#ef4444', fontWeight: 700, textDecoration: 'underline' }}>
+                                            vào đây
+                                        </a>
+                                        {' '}để tách nền cho chữ ký trước khi tải ảnh lên nhé
+                                    </p>
                                 </div>
+
+                                {/* Upload ảnh chữ ký */}
+                                {!sigPreview ? (
+                                    <label style={{
+                                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                        width: '100%', minHeight: '120px', border: '2px dashed #cbd5e1', borderRadius: '12px',
+                                        background: '#f8fafc', cursor: 'pointer', gap: '8px', marginBottom: '1rem'
+                                    }}>
+                                        <span style={{ fontSize: '2rem' }}>🖼️</span>
+                                        <span style={{ fontSize: '0.88rem', color: '#64748b' }}>Click để chọn ảnh chữ ký (PNG trong suốt)</span>
+                                        <input type="file" accept="image/png,image/*" style={{ display: 'none' }}
+                                            onChange={handleSigUpload} />
+                                    </label>
+                                ) : (
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '8px' }}>
+                                            ✅ Chữ ký của bạn — sẽ được chèn vào hợp đồng:
+                                        </p>
+                                        {/* Preview chữ ký trên nền hợp đồng */}
+                                        <div style={{
+                                            background: 'white', border: '1px solid #e2e8f0', borderRadius: '10px',
+                                            padding: '16px 24px', display: 'inline-block', minWidth: '200px',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                                        }}>
+                                            <img src={sigPreview} alt="Chữ ký"
+                                                style={{ maxWidth: '180px', maxHeight: '80px', objectFit: 'contain', display: 'block' }} />
+                                        </div>
+                                        <button className="btn-sm btn-outline" style={{ marginTop: '8px', marginLeft: '8px' }}
+                                            onClick={clearSig}>
+                                            🗑️ Chọn lại
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div className="modal-actions">
-                                    <button className="btn-primary" onClick={signContract} disabled={signing || !hasSig}>
+                                    <button className="btn-primary" onClick={signContract} disabled={signing || !sigPreview}>
                                         {signing ? 'Đang ký...' : '✅ Xác nhận ký hợp đồng'}
                                     </button>
-                                    <button className="btn-outline" onClick={() => setViewModal({ open: false, contract: null })}>Đóng</button>
+                                    <button className="btn-outline" onClick={() => { setViewModal({ open: false, contract: null }); clearSig(); }}>Đóng</button>
                                 </div>
                             </div>
                         )}
@@ -258,6 +399,90 @@ export default function TutorContractPage() {
                                 <button className="btn-outline" onClick={() => setViewModal({ open: false, contract: null })}>Đóng</button>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL QR ĐÓNG PHÍ SÀN */}
+            {feeModal && (
+                <div className="modal-overlay" onClick={() => setFeeModal(false)}>
+                    <div className="modal-box" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+                        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                            <div style={{ fontSize: '2rem', marginBottom: '4px' }}>💵</div>
+                            <h3 style={{ margin: 0, color: '#92400e' }}>Đóng phí sàn — 200.000đ</h3>
+                            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '6px 0 0' }}>
+                                Nộp một lần để kích hoạt tài khoản gia sư và bắt đầu tạo khóa học
+                            </p>
+                        </div>
+
+                        {/* QR + thông tin tài khoản */}
+                        {adminPayInfo?.qrImageUrl && (
+                            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                                <img
+                                    src={`http://localhost:8080/api/materials/download/${adminPayInfo.qrImageUrl}`}
+                                    alt="QR chuyển khoản"
+                                    style={{ width: 180, height: 180, objectFit: 'contain', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                        )}
+
+                        {adminPayInfo?.bankAccount && (
+                            <div style={{ background: '#f0f7ff', border: '1.5px solid #bfdbfe', borderRadius: '12px', padding: '12px 16px', marginBottom: '1rem', fontSize: '0.88rem' }}>
+                                <p style={{ fontWeight: 700, color: '#1e40af', margin: '0 0 8px' }}>🏦 Thông tin tài khoản</p>
+                                <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '6px 8px', color: '#374151' }}>
+                                    <span style={{ color: '#64748b' }}>Ngân hàng:</span><strong>{adminPayInfo.bankName}</strong>
+                                    <span style={{ color: '#64748b' }}>Số TK:</span><strong style={{ color: '#005BAA', fontSize: '1rem', letterSpacing: '1px' }}>{adminPayInfo.bankAccount}</strong>
+                                    <span style={{ color: '#64748b' }}>Chủ TK:</span><strong>{adminPayInfo.bankOwner}</strong>
+                                    <span style={{ color: '#64748b' }}>Số tiền:</span><strong style={{ color: '#005BAA' }}>200.000đ</strong>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Nội dung chuyển khoản tự sinh theo tên gia sư */}
+                        {(() => {
+                            const content = `PhiSan ${user?.fullName?.replace(/\s+/g, '') || 'GiaSu'}`;
+                            return (
+                                <div style={{ background: '#fff7ed', border: '2px solid #fed7aa', borderRadius: '12px', padding: '12px 16px', marginBottom: '1rem' }}>
+                                    <p style={{ fontSize: '0.82rem', color: '#92400e', fontWeight: 600, margin: '0 0 6px' }}>
+                                        ⚠️ Nội dung chuyển khoản (bắt buộc nhập đúng)
+                                    </p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <code style={{ flex: 1, background: 'white', border: '1.5px solid #fed7aa', borderRadius: '8px', padding: '8px 12px', fontSize: '1rem', fontWeight: 700, color: '#ef4444', letterSpacing: '0.5px' }}>
+                                            {content}
+                                        </code>
+                                        <button
+                                            onClick={() => { navigator.clipboard.writeText(content); }}
+                                            style={{ background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                            📋 Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Nộp minh chứng */}
+                        <div style={{ marginBottom: '1rem' }}>
+                            <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                                📤 Sau khi chuyển khoản, nộp minh chứng để Admin xác nhận:
+                            </p>
+                            <input type="file" accept="image/*,.pdf"
+                                onChange={e => setFeeProofFile(e.target.files?.[0] || null)}
+                                style={{ padding: '8px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.88rem', width: '100%', boxSizing: 'border-box' }} />
+                            {feeProofFile && <p style={{ fontSize: '0.82rem', color: '#10b981', marginTop: '4px' }}>✅ Đã chọn: {feeProofFile.name}</p>}
+                        </div>
+
+                        {feeProofMsg && (
+                            <p style={{ color: feeProofMsg.startsWith('✅') ? '#10b981' : '#ef4444', fontSize: '0.88rem', marginBottom: '8px' }}>
+                                {feeProofMsg}
+                            </p>
+                        )}
+
+                        <div className="modal-actions">
+                            <button className="btn-primary" onClick={submitFeeProof} disabled={submittingFee || !feeProofFile}>
+                                {submittingFee ? '⏳ Đang gửi...' : '📤 Nộp minh chứng'}
+                            </button>
+                            <button className="btn-outline" onClick={() => { setFeeModal(false); setFeeProofFile(null); setFeeProofMsg(''); }}>Đóng</button>
+                        </div>
                     </div>
                 </div>
             )}

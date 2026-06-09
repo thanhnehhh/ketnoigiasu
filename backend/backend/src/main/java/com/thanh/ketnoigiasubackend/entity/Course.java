@@ -66,4 +66,9 @@ public class Course {
     // Hình thức dạy: ONLINE | OFFLINE | BOTH
     @Builder.Default
     private String teachingMode = "BOTH";
+
+    // Lịch dạy dự kiến — JSON string, ví dụ:
+    // [{"day":"MON","startTime":"19:00","endTime":"21:00"},{"day":"WED","startTime":"19:00","endTime":"21:00"}]
+    @Column(columnDefinition = "TEXT")
+    private String schedule;
 }

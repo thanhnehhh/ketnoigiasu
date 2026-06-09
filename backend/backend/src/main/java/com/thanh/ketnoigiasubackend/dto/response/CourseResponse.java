@@ -17,6 +17,7 @@ public class CourseResponse {
     private String subjectName;
     private String tutorName;
     private Long tutorProfileId;   // để frontend link sang trang profile gia sư
+    private Long subjectId;         // để frontend pre-fill đúng môn khi sửa
     private Double pricePerSession;
     private Integer totalSessions;
     private String status;
@@ -27,6 +28,8 @@ public class CourseResponse {
     private Double avgRating;
     private Integer registrationCount;
     private Double score;
-    private String teachingMode; // ONLINE | OFFLINE | BOTH
-    private boolean hasApprovedStudent; // true nếu đã có học viên được duyệt (lớp đầy)
+    private String teachingMode;
+    private boolean hasApprovedStudent;
+    private String schedule;
+    private String tutorAddress; // để học viên xem bản đồ khoảng cách
 }

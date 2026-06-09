@@ -181,7 +181,14 @@ export default function ProfilePage() {
                                         </div>
                                         <div className="form-group">
                                             <label>Địa chỉ</label>
-                                            <input value={profile.address || ''} onChange={e => set('address', e.target.value)} />
+                                            <input
+                                                value={profile.address || ''}
+                                                onChange={e => set('address', e.target.value)}
+                                                placeholder="VD: Phường Linh Trung, Thủ Đức, TP. Hồ Chí Minh"
+                                            />
+                                            <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
+                                                📍 Nhập đầy đủ: Phường/Xã, Quận/Huyện, Tỉnh/Thành phố — dùng để hiển thị bản đồ
+                                            </span>
                                         </div>
 
                                         {user?.role === 'STUDENT' && (

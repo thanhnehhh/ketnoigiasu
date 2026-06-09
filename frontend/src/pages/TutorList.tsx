@@ -12,8 +12,11 @@ interface Tutor {
     major: string;
     strengths: string;
     address: string;
+    avatarUrl: string | null;
     subjects: string[] | string;
     grades: string[] | string;
+    reputationScore: number;
+    reputationLabel: string;
 }
 
 const SUBJECTS = ['Toán','Lý','Hóa','Văn','Tiếng Anh','Tiếng Trung','Tiếng Nhật','IELTS','TOEIC','Lịch sử','Địa lý','Sinh học','Tin học'];
@@ -43,6 +46,13 @@ export default function TutorList() {
         if (typeof t.subjects === 'string' && t.subjects)
             return t.subjects.replace(/[\[\]"]/g, '').split(',').map(s => s.trim()).filter(Boolean);
         return [];
+    };
+
+    const getReputationColor = (score: number) => {
+        if (score >= 85) return '#10b981';
+        if (score >= 70) return '#3b82f6';
+        if (score >= 50) return '#f59e0b';
+        return '#ef4444';
     };
 
     return (
@@ -99,12 +109,28 @@ export default function TutorList() {
                                     <div key={t.id} className="tl-card">
                                         <div className="tl-card-top">
                                             <img
-                                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(t.fullName)}&background=4f46e5&color=fff&size=64&bold=true&rounded=true`}
+                                                src={t.avatarUrl
+                                                    ? `http://localhost:8080/api/materials/download/${t.avatarUrl}`
+                                                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(t.fullName)}&background=4f46e5&color=fff&size=64&bold=true&rounded=true`}
                                                 alt={t.fullName}
                                                 className="tl-avatar"
                                             />
                                             <div className="tl-card-info">
-                                                <h3>{t.fullName}</h3>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <h3 style={{ margin: 0 }}>{t.fullName}</h3>
+                                                    {/* Badge điểm uy tín */}
+                                                    <span style={{
+                                                        background: getReputationColor(t.reputationScore),
+                                                        color: 'white',
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 700,
+                                                        padding: '2px 8px',
+                                                        borderRadius: '20px',
+                                                        whiteSpace: 'nowrap',
+                                                    }}>
+                                                        ⭐ {t.reputationScore} · {t.reputationLabel}
+                                                    </span>
+                                                </div>
                                                 {t.school && <p>🎓 {t.school}{t.major ? ` · ${t.major}` : ''}</p>}
                                                 {t.address && <p>📍 {t.address}</p>}
                                             </div>
@@ -128,7 +154,22 @@ export default function TutorList() {
                                         )}
 
                                         <div className="tl-card-footer">
-                                            <span className="tl-verified">✓ Đã xác minh</span>
+                                            {/* Thanh điểm uy tín */}
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', marginBottom: '3px' }}>
+                                                    <span>Độ uy tín</span>
+                                                    <span style={{ color: getReputationColor(t.reputationScore), fontWeight: 700 }}>{t.reputationScore}/100</span>
+                                                </div>
+                                                <div style={{ height: '5px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                                                    <div style={{
+                                                        height: '100%',
+                                                        width: `${t.reputationScore}%`,
+                                                        background: getReputationColor(t.reputationScore),
+                                                        borderRadius: '10px',
+                                                        transition: 'width 0.3s',
+                                                    }} />
+                                                </div>
+                                            </div>
                                             <Link to={`/tutor-profile/${t.id}`} className="tl-btn-view">
                                                 Xem hồ sơ →
                                             </Link>

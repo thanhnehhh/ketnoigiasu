@@ -39,4 +39,8 @@ public class TutorProfileResponse {
     private String bio;       // Giới thiệu bản thân
     private String avatarUrl; // Ảnh đại diện upload
     private String teachingMode; // ONLINE | OFFLINE | BOTH
+
+    // Điểm uy tín (0-100)
+    private int reputationScore;
+    private String reputationLabel; // "Xuất sắc" / "Tốt" / "Trung bình" / "Cần cải thiện"
 }

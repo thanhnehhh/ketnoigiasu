@@ -45,19 +45,29 @@ api.interceptors.response.use(
     (error) => {
         const url = error.config?.url || '';
         const status = error.response?.status;
+        const message = error.response?.data?.message || error.response?.data || '';
 
         if (status === 401) {
-            console.warn('[401] URL bị từ chối:', url);
+            console.warn('[401] URL bị từ chối:', url, '| message:', message);
 
             const isPublic = url.includes('/public/') || url.includes('/auth/') || url.includes('/otp/');
 
-            // Chỉ redirect khi token thực sự hết hạn, không phải lỗi permission
-            if (!isPublic && !redirecting && isTokenExpired()) {
+            // Chỉ redirect khi token thực sự hết hạn (message chứa "expired" hoặc token invalid)
+            // KHÔNG redirect khi lỗi là "Full authentication is required" do Spring Security
+            // vì đó có thể là lỗi permission tạm thời, không phải token hết hạn
+            const isExpiredToken = isTokenExpired()
+                || (typeof message === 'string' && (
+                    message.toLowerCase().includes('expired')
+                    || message.toLowerCase().includes('invalid token')
+                    || message.toLowerCase().includes('jwt')
+                ));
+
+            if (!isPublic && !redirecting && isExpiredToken) {
                 redirecting = true;
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
                 toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-                setTimeout(() => window.location.replace('/login'), 1500);
+                setTimeout(() => { redirecting = false; window.location.replace('/login'); }, 1500);
             }
         }
         return Promise.reject(error);

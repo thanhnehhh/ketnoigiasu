@@ -66,7 +66,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             } catch (Exception e) {
-                System.out.println("JWT ERROR: " + e.getMessage());
+                // Token invalid hoặc user không tồn tại — bỏ qua, Spring Security sẽ trả 401
+                System.err.println("[JWT Filter] Token validation failed: " + e.getClass().getSimpleName() + " - " + e.getMessage());
             }
         }
 

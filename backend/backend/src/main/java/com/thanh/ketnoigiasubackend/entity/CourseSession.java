@@ -48,6 +48,12 @@ public class CourseSession {
     private boolean studentDisputed = false;   // true = học viên phản đối
     private String disputeReason;              // lý do phản đối
 
+    // Phí sàn của buổi này (tính khi gia sư xác nhận hoàn thành)
+    // ONLINE: pricePerSession * onlineFeePercent / 100
+    // OFFLINE: pricePerSession * offlineFeePercent / 100
+    private Double sessionFee;         // số tiền phí sàn (VNĐ)
+    private String sessionMode;        // "ONLINE" | "OFFLINE" — xác định khi gia sư confirm
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 }

@@ -65,6 +65,8 @@ public class ProfileService {
                 .bio(tutor.getBio())
                 .avatarUrl(tutor.getAvatarUrl())
                 .teachingMode(tutor.getTeachingMode())
+                .reputationScore(tutor.getReputationScore())
+                .reputationLabel(ReputationService.getLabel(tutor.getReputationScore()))
                 .build();
     }
 

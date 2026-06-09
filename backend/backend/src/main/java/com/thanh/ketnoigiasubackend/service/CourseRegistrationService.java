@@ -87,8 +87,12 @@ public class CourseRegistrationService {
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    @Transactional
     public RegistrationResponse updateStatus(Long registrationId, String status, String email) {
+        return updateStatus(registrationId, status, email, null);
+    }
+
+    @Transactional
+    public RegistrationResponse updateStatus(Long registrationId, String status, String email, String reason) {
         CourseRegistration reg = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đăng ký"));
         if (!reg.getCourse().getTutor().getUser().getEmail().equals(email))
@@ -146,9 +150,11 @@ public class CourseRegistrationService {
                     "/tutor?tab=applications");
 
         } else if ("REJECTED".equalsIgnoreCase(status)) {
-            // Thông báo học viên bị từ chối → link đến tab khóa học
+            String reasonMsg = (reason != null && !reason.isBlank())
+                    ? " Lý do: " + reason
+                    : "";
             notificationService.createNotification(reg.getStudent().getUser(),
-                    "❌ Đơn đăng ký lớp '" + reg.getCourse().getTitle() + "' đã bị từ chối.",
+                    "❌ Đơn đăng ký lớp '" + reg.getCourse().getTitle() + "' đã bị từ chối." + reasonMsg,
                     "/student?tab=courses");
         }
 
@@ -163,6 +169,7 @@ public class CourseRegistrationService {
                 .courseTitle(reg.getCourse().getTitle())
                 .tutorName(reg.getCourse().getTutor().getUser().getFullName())
                 .studentName(reg.getStudent().getUser().getFullName())
+                .studentAddress(reg.getStudent().getAddress())
                 .status(reg.getStatus()).notes(reg.getNotes())
                 .pricePerSession(reg.getCourse().getPricePerSession())
                 .appliedAt(reg.getAppliedAt())

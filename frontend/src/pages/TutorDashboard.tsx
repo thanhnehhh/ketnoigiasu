@@ -5,12 +5,16 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import SchedulePicker from '../components/SchedulePicker';
+import type { ScheduleSlot } from '../components/SchedulePicker';
+import MapModal from '../components/MapModal';
 import '../css/Dashboard.css';
 
 interface Course {
     id: number;
     title: string;
     subjectName: string;
+    subjectId: number;
     status: string;
     pricePerSession: number;
     totalSessions: number;
@@ -23,6 +27,7 @@ interface Registration {
     id: number;
     courseTitle: string;
     studentName: string;
+    studentAddress: string;
     status: string;
     appliedAt: string;
     notes: string;
@@ -76,6 +81,19 @@ export default function TutorDashboard() {
     const [reviews, setReviews] = useState<Review[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Điểm uy tín
+    const [reputationScore, setReputationScore] = useState<number>(50);
+    const [reputationLabel, setReputationLabel] = useState<string>('Trung bình');
+
+    // Bản đồ
+    const [mapModal, setMapModal] = useState<{ open: boolean; app: Registration | null }>({ open: false, app: null });
+    const [tutorAddress, setTutorAddress] = useState<string>('');
+
+    // Modal từ chối đơn đăng ký
+    const [rejectModal, setRejectModal] = useState<{ open: boolean; id: number | null }>({ open: false, id: null });
+    const [rejectReason, setRejectReason] = useState('');
+    const [rejectMsg, setRejectMsg] = useState('');
+
     // Reply modal
     const [replyModal, setReplyModal] = useState<{ open: boolean; reviewId: number | null }>({ open: false, reviewId: null });
     const [replyText, setReplyText] = useState('');
@@ -102,6 +120,9 @@ export default function TutorDashboard() {
     const [courseMsg, setCourseMsg] = useState('');
     const [subjects, setSubjects] = useState<{ id: number; name: string }[]>([]);
 
+    // Lịch dạy dự kiến
+    const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]);
+
     // Modal phí sàn
     const [feeModal, setFeeModal] = useState(false);
     const [feeProofFile, setFeeProofFile] = useState<File | null>(null);
@@ -111,6 +132,14 @@ export default function TutorDashboard() {
     useEffect(() => {
         fetchAll();
         api.get('/public/subjects').then(res => setSubjects(res.data)).catch(console.error);
+        // Lấy điểm uy tín từ profile
+        api.get('/profile/me').then(res => {
+            if (res.data.reputationScore !== undefined) {
+                setReputationScore(res.data.reputationScore);
+                setReputationLabel(res.data.reputationLabel || '');
+            }
+            if (res.data.address) setTutorAddress(res.data.address);
+        }).catch(console.error);
     }, []);
 
     const fetchAll = async () => {
@@ -142,10 +171,11 @@ export default function TutorDashboard() {
                 totalSessions: parseInt(courseForm.totalSessions),
                 subjectId: parseInt(courseForm.subjectId),
                 teachingMode: courseForm.teachingMode,
+                schedule: scheduleSlots.length > 0 ? JSON.stringify(scheduleSlots) : null,
             };
             if (courseModal.editing) {
                 await api.put(`/courses/${courseModal.editing.id}`, payload);
-                setCourseMsg('✅ Cập nhật thành công! Khóa học đang chờ duyệt lại.');
+                setCourseMsg('✅ Cập nhật thành công!');
             } else {
                 await api.post('/courses', payload);
                 setCourseMsg('✅ Tạo khóa học thành công! Đang chờ Admin duyệt.');
@@ -162,9 +192,14 @@ export default function TutorDashboard() {
             description: '',
             pricePerSession: String(course.pricePerSession),
             totalSessions: String(course.totalSessions),
-            subjectId: '1',
+            subjectId: course.subjectId ? String(course.subjectId) : (subjects.length > 0 ? String(subjects[0].id) : '1'),
             teachingMode: 'BOTH',
         });
+        // Load lại schedule nếu có
+        try {
+            const parsed = course.schedule ? JSON.parse(course.schedule) : [];
+            setScheduleSlots(parsed);
+        } catch { setScheduleSlots([]); }
         setCourseModal({ open: true, editing: course });
         setCourseMsg('');
     };
@@ -205,6 +240,22 @@ export default function TutorDashboard() {
     const reviewApplication = async (id: number, status: 'APPROVED' | 'REJECTED') => {
         await api.put(`/tutor/registrations/${id}/status`, null, { params: { status } });
         fetchAll();
+    };
+
+    const submitReject = async () => {
+        if (!rejectModal.id) return;
+        try {
+            await api.put(`/tutor/registrations/${rejectModal.id}/status`, null, {
+                params: { status: 'REJECTED', reason: rejectReason.trim() || 'Không phù hợp' }
+            });
+            setRejectModal({ open: false, id: null });
+            setRejectReason('');
+            setRejectMsg('');
+            fetchAll();
+            toast.success('Đã từ chối đơn đăng ký.');
+        } catch (e: any) {
+            setRejectMsg('❌ ' + (e.response?.data?.message || 'Lỗi'));
+        }
     };
 
     const markAllRead = async () => {
@@ -269,6 +320,26 @@ export default function TutorDashboard() {
                         <div>
                             <div className="dash-name">{user?.fullName}</div>
                             <div className="dash-role-badge tutor">Gia sư</div>
+                            {/* Badge điểm uy tín */}
+                            <div style={{ marginTop: '6px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', marginBottom: '3px' }}>
+                                    <span>Độ uy tín</span>
+                                    <span style={{
+                                        fontWeight: 700,
+                                        color: reputationScore >= 85 ? '#10b981' : reputationScore >= 70 ? '#3b82f6' : reputationScore >= 50 ? '#f59e0b' : '#ef4444'
+                                    }}>{reputationScore}/100</span>
+                                </div>
+                                <div style={{ height: '5px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden', width: '100%' }}>
+                                    <div style={{
+                                        height: '100%',
+                                        width: `${reputationScore}%`,
+                                        background: reputationScore >= 85 ? '#10b981' : reputationScore >= 70 ? '#3b82f6' : reputationScore >= 50 ? '#f59e0b' : '#ef4444',
+                                        borderRadius: '10px',
+                                        transition: 'width 0.3s',
+                                    }} />
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>{reputationLabel}</div>
+                            </div>
                         </div>
                     </div>
                     <nav className="dash-nav">
@@ -308,6 +379,7 @@ export default function TutorDashboard() {
                                         <h2 className="dash-title" style={{ margin: 0 }}>Khóa học của tôi</h2>
                                         <button className="btn-primary" onClick={() => {
                                             setCourseForm({ title: '', description: '', pricePerSession: '', totalSessions: '', subjectId: subjects.length > 0 ? String(subjects[0].id) : '1', teachingMode: 'BOTH' });
+                                            setScheduleSlots([]);
                                             setCourseModal({ open: true, editing: null });
                                             setCourseMsg('');
                                         }}>+ Tạo khóa học</button>
@@ -419,11 +491,23 @@ export default function TutorDashboard() {
                                                         </div>
                                                         <p>📚 <strong>{app.courseTitle}</strong></p>
                                                         {app.notes && <p>📝 {app.notes}</p>}
+                                                        {app.studentAddress && (
+                                                            <p style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                                                                📍 {app.studentAddress}
+                                                            </p>
+                                                        )}
                                                         <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>📅 {new Date(app.appliedAt).toLocaleDateString('vi-VN')}</p>
                                                         {app.status === 'PENDING' && (
                                                             <div className="reg-actions">
                                                                 <button className="btn-sm btn-primary" onClick={() => reviewApplication(app.id, 'APPROVED')}>✅ Duyệt</button>
-                                                                <button className="btn-sm btn-danger" onClick={() => reviewApplication(app.id, 'REJECTED')}>❌ Từ chối</button>
+                                                                <button className="btn-sm btn-danger" onClick={() => { setRejectModal({ open: true, id: app.id }); setRejectReason(''); setRejectMsg(''); }}>❌ Từ chối</button>
+                                                                {app.studentAddress && (
+                                                                    <button className="btn-sm btn-outline"
+                                                                        style={{ color: '#059669', borderColor: '#059669' }}
+                                                                        onClick={() => setMapModal({ open: true, app })}>
+                                                                        🗺️ Xem bản đồ
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         )}
                                                         {app.status === 'ACTIVE' && (
@@ -437,6 +521,13 @@ export default function TutorDashboard() {
                                                                         title={`Còn ${app.totalSessions - app.completedSessions} buổi chưa xong`}
                                                                         style={{ opacity: 0.5, cursor: 'not-allowed' }}>
                                                                         📊 {app.completedSessions}/{app.totalSessions} buổi
+                                                                    </button>
+                                                                )}
+                                                                {app.studentAddress && (
+                                                                    <button className="btn-sm btn-outline"
+                                                                        style={{ color: '#059669', borderColor: '#059669' }}
+                                                                        onClick={() => setMapModal({ open: true, app })}>
+                                                                        🗺️ Xem bản đồ
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -613,6 +704,13 @@ export default function TutorDashboard() {
                                 <option value="ONLINE">🌐 Online</option>
                                 <option value="OFFLINE">🏠 Offline (Tại nhà)</option>
                             </select>
+
+                            {/* === LỊCH DẠY DỰ KIẾN === */}
+                            <label style={{ marginTop: '8px' }}>📅 Lịch dạy dự kiến <span style={{ fontWeight: 400, color: '#94a3b8' }}>(tùy chọn — giúp học viên biết lịch trước khi đăng ký)</span></label>
+                            <SchedulePicker
+                                value={scheduleSlots}
+                                onChange={setScheduleSlots}
+                            />
                         </div>
                         {courseMsg && <p style={{ color: courseMsg.startsWith('✅') ? '#10b981' : '#ef4444', marginTop: '8px' }}>{courseMsg}</p>}
                         <div className="modal-actions">
@@ -686,6 +784,45 @@ export default function TutorDashboard() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* MODAL TỪ CHỐI ĐƠN ĐĂNG KÝ */}
+            {rejectModal.open && (
+                <div className="modal-overlay" onClick={() => setRejectModal({ open: false, id: null })}>
+                    <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                        <h3>❌ Từ chối đơn đăng ký</h3>
+                        <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                            Vui lòng cho biết lý do để học viên hiểu và cải thiện.
+                        </p>
+                        <div className="modal-form">
+                            <label>Lý do từ chối</label>
+                            <textarea
+                                className="modal-input"
+                                rows={3}
+                                value={rejectReason}
+                                onChange={e => setRejectReason(e.target.value)}
+                                placeholder="VD: Học viên chưa cung cấp đủ thông tin, lịch học không phù hợp, khu vực quá xa..."
+                            />
+                        </div>
+                        {rejectMsg && <p style={{ color: '#ef4444', fontSize: '0.88rem', marginTop: '8px' }}>{rejectMsg}</p>}
+                        <div className="modal-actions">
+                            <button className="btn-danger" onClick={submitReject}>
+                                ❌ Xác nhận từ chối
+                            </button>
+                            <button className="btn-outline" onClick={() => setRejectModal({ open: false, id: null })}>Hủy</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL BẢN ĐỒ */}
+            {mapModal.open && mapModal.app && (
+                <MapModal
+                    studentName={mapModal.app.studentName}
+                    studentAddress={mapModal.app.studentAddress}
+                    tutorAddress={tutorAddress}
+                    onClose={() => setMapModal({ open: false, app: null })}
+                />
             )}
 
             <Footer />

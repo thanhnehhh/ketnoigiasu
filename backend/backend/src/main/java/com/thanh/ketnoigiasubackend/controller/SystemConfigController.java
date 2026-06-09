@@ -29,6 +29,25 @@ public class SystemConfigController {
         return ResponseEntity.ok(result);
     }
 
+    /** Public: lấy tỉ lệ phí sàn */
+    @GetMapping("/api/public/platform-fee")
+    public ResponseEntity<Map<String, Object>> getPlatformFee() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("onlineFeePercent",  Double.parseDouble(getConfig("fee.online",  "15.0")));
+        result.put("offlineFeePercent", Double.parseDouble(getConfig("fee.offline", "8.0")));
+        return ResponseEntity.ok(result);
+    }
+
+    /** Admin: cập nhật tỉ lệ phí sàn */
+    @PutMapping("/api/admin/platform-fee")
+    public ResponseEntity<?> updatePlatformFee(@RequestBody Map<String, Object> body) {
+        if (body.containsKey("onlineFeePercent"))
+            saveConfig("fee.online",  body.get("onlineFeePercent").toString());
+        if (body.containsKey("offlineFeePercent"))
+            saveConfig("fee.offline", body.get("offlineFeePercent").toString());
+        return ResponseEntity.ok("Đã cập nhật tỉ lệ phí sàn");
+    }
+
     /** Admin: cập nhật thông tin ngân hàng */
     @PutMapping("/api/admin/payment-info")
     public ResponseEntity<?> updatePaymentInfo(@RequestBody Map<String, String> body) {
