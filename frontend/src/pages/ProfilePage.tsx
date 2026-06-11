@@ -34,6 +34,12 @@ export default function ProfilePage() {
     const [avatarMsg, setAvatarMsg] = useState('');
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+    // Nộp hồ sơ xét duyệt (tutor)
+    const [qualFile, setQualFile] = useState<File | null>(null);
+    const [verifyNote, setVerifyNote] = useState('');
+    const [verifyMsg, setVerifyMsg] = useState('');
+    const [submittingVerify, setSubmittingVerify] = useState(false);
+
     useEffect(() => { fetchProfile(); }, []);
 
     const fetchProfile = async () => {
@@ -124,6 +130,24 @@ export default function ProfilePage() {
         } catch (e: any) {
             setAvatarMsg('❌ ' + (e.response?.data?.message || 'Lỗi upload'));
         } finally { setUploadingAvatar(false); }
+    };
+
+    const handleSubmitVerification = async () => {
+        setSubmittingVerify(true);
+        setVerifyMsg('');
+        try {
+            const fd = new FormData();
+            if (qualFile) fd.append('file', qualFile);
+            if (verifyNote.trim()) fd.append('note', verifyNote);
+            await api.post('/profile/tutor/submit-verification', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setVerifyMsg('✅ Đã nộp hồ sơ! Admin sẽ xét duyệt sớm.');
+            setQualFile(null);
+            fetchProfile();
+        } catch (e: any) {
+            setVerifyMsg('❌ ' + (e.response?.data?.message || 'Lỗi nộp hồ sơ'));
+        } finally { setSubmittingVerify(false); }
     };
 
     return (
@@ -292,6 +316,92 @@ export default function ProfilePage() {
                                             {avatarMsg && <p style={{ fontSize: '0.82rem', marginTop: '6px', color: avatarMsg.startsWith('✅') ? '#10b981' : '#ef4444' }}>{avatarMsg}</p>}
                                         </div>
                                     )}
+
+                                    {/* Section nộp hồ sơ xét duyệt */}
+                                    {user?.role === 'TUTOR' && (() => {
+                                        const vs = profile.verificationStatus;
+                                        const statusColor = vs === 'APPROVED' ? '#059669' : vs === 'PENDING' ? '#f59e0b' : vs === 'REJECTED' ? '#ef4444' : '#94a3b8';
+                                        const statusLabel = vs === 'APPROVED' ? '✅ Đã được duyệt' : vs === 'PENDING' ? '⏳ Đang chờ duyệt' : vs === 'REJECTED' ? '❌ Bị từ chối' : '⚪ Chưa nộp';
+                                        return (
+                                            <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: '#f8fafc', borderRadius: '12px', border: `1.5px solid ${vs === 'APPROVED' ? '#bbf7d0' : vs === 'REJECTED' ? '#fecaca' : '#e2e8f0'}` }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>📋 Xét duyệt hồ sơ gia sư</h3>
+                                                    <span style={{ fontWeight: 700, color: statusColor, fontSize: '0.88rem' }}>{statusLabel}</span>
+                                                </div>
+
+                                                {vs === 'APPROVED' && (
+                                                    <p style={{ fontSize: '0.88rem', color: '#059669', margin: 0 }}>
+                                                        🎉 Hồ sơ đã được duyệt. Bạn có thể tạo khóa học thoải mái!
+                                                    </p>
+                                                )}
+
+                                                {vs === 'REJECTED' && profile.verificationNote && (
+                                                    <div style={{ background: '#fee2e2', borderRadius: '8px', padding: '10px 14px', marginBottom: '1rem', fontSize: '0.85rem', color: '#b91c1c' }}>
+                                                        💬 Lý do từ chối: <strong>{profile.verificationNote}</strong>
+                                                    </div>
+                                                )}
+
+                                                {(vs === 'NONE' || vs === 'REJECTED') && (
+                                                    <div>
+                                                        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
+                                                            Nộp bằng cấp/chứng chỉ để Admin xét duyệt. Sau khi duyệt bạn có thể tạo khóa học ngay mà không cần Admin duyệt từng khóa.
+                                                        </p>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                            <div>
+                                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>
+                                                                    📎 Ảnh bằng cấp / chứng chỉ *
+                                                                </label>
+                                                                <input type="file" accept="image/*,.pdf"
+                                                                    onChange={e => setQualFile(e.target.files?.[0] || null)}
+                                                                    style={{ fontSize: '0.88rem', width: '100%' }} />
+                                                                {qualFile && <p style={{ fontSize: '0.78rem', color: '#10b981', marginTop: '3px' }}>✅ {qualFile.name}</p>}
+                                                            </div>
+                                                            {/* Hiện ảnh bằng cấp đã nộp trước đó */}
+                                                            {profile.qualificationImageUrl && (
+                                                                <div>
+                                                                    <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '4px' }}>Ảnh đã nộp trước:</p>
+                                                                    <img src={`http://localhost:8080/api/materials/download/${profile.qualificationImageUrl}`}
+                                                                        alt="qualification"
+                                                                        style={{ maxWidth: '200px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>
+                                                                    💬 Lời nhắn cho Admin (tùy chọn)
+                                                                </label>
+                                                                <textarea
+                                                                    value={verifyNote}
+                                                                    onChange={e => setVerifyNote(e.target.value)}
+                                                                    rows={2}
+                                                                    style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.88rem', resize: 'vertical', boxSizing: 'border-box' }}
+                                                                    placeholder="VD: Tôi tốt nghiệp ĐH Sư phạm, có 3 năm kinh nghiệm dạy kèm..."
+                                                                />
+                                                            </div>
+                                                            {verifyMsg && <p style={{ color: verifyMsg.startsWith('✅') ? '#10b981' : '#ef4444', fontSize: '0.88rem' }}>{verifyMsg}</p>}
+                                                            <button type="button" className="btn-primary" onClick={handleSubmitVerification}
+                                                                disabled={submittingVerify}
+                                                                style={{ padding: '10px 20px', alignSelf: 'flex-start' }}>
+                                                                {submittingVerify ? '⏳ Đang nộp...' : '📤 Nộp hồ sơ xét duyệt'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {vs === 'PENDING' && (
+                                                    <div>
+                                                        <p style={{ fontSize: '0.85rem', color: '#92400e', margin: '0 0 8px' }}>
+                                                            Hồ sơ của bạn đang được Admin xem xét. Vui lòng chờ thông báo qua hệ thống.
+                                                        </p>
+                                                        {profile.qualificationImageUrl && (
+                                                            <img src={`http://localhost:8080/api/materials/download/${profile.qualificationImageUrl}`}
+                                                                alt="qualification"
+                                                                style={{ maxWidth: '160px', borderRadius: '8px', border: '1px solid #fde68a' }} />
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                 </form>
                             )}
 

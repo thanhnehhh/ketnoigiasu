@@ -15,8 +15,9 @@ interface Contract { id: number; tutorId: number; tutorName: string; tutorEmail:
 interface RefundRequest { id: number; paymentId: number; courseTitle: string; amount: number; studentName: string; reason: string; evidenceUrl: string; status: string; adminNote: string | null; createdAt: string; }
 interface FinanceSummary { totalTuition: number; totalPlatformFee: number; totalPromote: number; platformPercentFee: number; totalRevenue: number; pendingPaymentCount: number; activeStudents: number; activeTutors: number; }
 interface AdminUser { id: number; email: string; fullName: string; role: string; phone: string; enabled: boolean; createdAt: string; }
+interface TutorVerification { tutorProfileId: number; fullName: string; email: string; school: string; major: string; strengths: string; qualificationImageUrl: string; verificationNote: string; verificationStatus: string; }
 
-type AdminTab = 'overview' | 'courses' | 'payments' | 'finance' | 'reports' | 'complaints' | 'contracts' | 'users';
+type AdminTab = 'overview' | 'courses' | 'payments' | 'finance' | 'reports' | 'complaints' | 'contracts' | 'users' | 'tutors';
 
 // ===== STAT CARD COMPONENT =====
 function StatCard({ icon, label, value, sub, color, onClick }: { icon: string; label: string; value: string | number; sub?: string; color: string; onClick?: () => void }) {
@@ -127,8 +128,15 @@ export default function AdminDashboard() {
     const [userKeyword, setUserKeyword] = useState('');
     const [togglingUser, setTogglingUser] = useState<number | null>(null);
 
+    // Duyệt hồ sơ gia sư
+    const [tutorVerifications, setTutorVerifications] = useState<TutorVerification[]>([]);
+    const [verifyFilter, setVerifyFilter] = useState<'PENDING'|'APPROVED'|'REJECTED'>('PENDING');
+    const [rejectReasonModal, setRejectReasonModal] = useState<{ open: boolean; id: number | null }>({ open: false, id: null });
+    const [rejectReasonText, setRejectReasonText] = useState('');
+
     useEffect(() => {
         fetchAll();
+        fetchTutorVerifications('PENDING');
         api.get('/public/payment-info').then(res => {
             setVietQRConfig({ bankName: res.data.bankName || '', bankAccount: res.data.bankAccount || '', bankOwner: res.data.bankOwner || '' });
             if (res.data.qrImageUrl) setVietQRPreview(res.data.qrImageUrl);
@@ -181,6 +189,27 @@ export default function AdminDashboard() {
             const res = await api.get('/admin/users', { params });
             setUsers(res.data);
         } catch (e) { console.error(e); }
+    };
+
+    const fetchTutorVerifications = async (status = verifyFilter) => {
+        try {
+            const res = await api.get('/admin/users/tutor-verifications', { params: { status } });
+            setTutorVerifications(res.data);
+        } catch (e) { console.error(e); }
+    };
+
+    const reviewTutor = async (tutorProfileId: number, action: 'APPROVED' | 'REJECTED', reason?: string) => {
+        try {
+            await api.put(`/admin/users/tutor-verifications/${tutorProfileId}`, null, {
+                params: { action, reason: reason || '' }
+            });
+            toast.success(action === 'APPROVED' ? '✅ Đã duyệt hồ sơ gia sư!' : '❌ Đã từ chối hồ sơ');
+            setRejectReasonModal({ open: false, id: null });
+            setRejectReasonText('');
+            fetchTutorVerifications(verifyFilter);
+        } catch (e: any) {
+            toast.error(e.response?.data?.message || 'Lỗi');
+        }
     };
 
     const toggleUserStatus = async (userId: number) => {
@@ -403,6 +432,12 @@ export default function AdminDashboard() {
                         </button>
                         <button className={tab === 'users' ? 'active' : ''} onClick={() => { setTab('users'); fetchUsers('ALL', ''); setUserRoleFilter('ALL'); setUserKeyword(''); }}>
                             👥 Quản lý người dùng
+                        </button>
+                        <button className={tab === 'tutors' ? 'active' : ''} onClick={() => { setTab('tutors'); fetchTutorVerifications('PENDING'); }}>
+                            📋 Duyệt hồ sơ gia sư
+                            {tutorVerifications.filter(t => t.verificationStatus === 'PENDING').length > 0 && (
+                                <span className="badge">{tutorVerifications.filter(t => t.verificationStatus === 'PENDING').length}</span>
+                            )}
                         </button>
                         <button className="logout-btn" onClick={logout}>🚪 Đăng xuất</button>
                     </nav>
@@ -1295,10 +1330,122 @@ export default function AdminDashboard() {
                                     </p>
                                 </div>
                             )}
+
+                            {/* DUYỆT HỒ SƠ GIA SƯ */}
+                            {tab === 'tutors' && (
+                                <div>
+                                    <h2 className="dash-title">Duyệt hồ sơ gia sư</h2>
+
+                                    {/* Filter */}
+                                    <div className="course-filter-bar" style={{ marginBottom: '1.5rem' }}>
+                                        {([
+                                            { key: 'PENDING',  label: '⏳ Chờ duyệt',  color: '#f59e0b' },
+                                            { key: 'APPROVED', label: '✅ Đã duyệt',    color: '#10b981' },
+                                            { key: 'REJECTED', label: '❌ Bị từ chối',  color: '#ef4444' },
+                                        ] as const).map(f => (
+                                            <button key={f.key}
+                                                className={`course-filter-btn ${verifyFilter === f.key ? 'active' : ''}`}
+                                                style={{ '--filter-color': f.color } as any}
+                                                onClick={() => { setVerifyFilter(f.key); fetchTutorVerifications(f.key); }}>
+                                                {f.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {tutorVerifications.length === 0 ? (
+                                        <div className="empty-state"><p>Không có hồ sơ nào trong mục này.</p></div>
+                                    ) : (
+                                        <div className="card-list">
+                                            {tutorVerifications.map(t => (
+                                                <div key={t.tutorProfileId} className="reg-card">
+                                                    <div className="reg-card-header">
+                                                        <div>
+                                                            <h3 style={{ margin: 0 }}>{t.fullName}</h3>
+                                                            <p style={{ margin: '2px 0', fontSize: '0.82rem', color: '#64748b' }}>📧 {t.email}</p>
+                                                        </div>
+                                                        <span className="status-badge" style={{
+                                                            background: t.verificationStatus === 'APPROVED' ? '#10b981' : t.verificationStatus === 'PENDING' ? '#f59e0b' : '#ef4444'
+                                                        }}>
+                                                            {t.verificationStatus === 'APPROVED' ? '✅ Đã duyệt' : t.verificationStatus === 'PENDING' ? '⏳ Chờ duyệt' : '❌ Từ chối'}
+                                                        </span>
+                                                    </div>
+
+                                                    {t.school && <p>🎓 {t.school}{t.major ? ` · ${t.major}` : ''}</p>}
+                                                    {t.strengths && (
+                                                        <p style={{ fontSize: '0.85rem', color: '#374151', fontStyle: 'italic' }}>
+                                                            "{t.strengths.length > 150 ? t.strengths.slice(0, 150) + '...' : t.strengths}"
+                                                        </p>
+                                                    )}
+                                                    {t.verificationNote && (
+                                                        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '8px 12px', fontSize: '0.85rem', color: '#0369a1' }}>
+                                                            💬 Lời nhắn: {t.verificationNote}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Ảnh bằng cấp */}
+                                                    {t.qualificationImageUrl && (
+                                                        <div style={{ marginTop: '8px' }}>
+                                                            <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>📎 Bằng cấp/Chứng chỉ:</p>
+                                                            <a href={`http://localhost:8080/api/materials/download/${t.qualificationImageUrl}`}
+                                                                target="_blank" rel="noopener noreferrer">
+                                                                <img src={`http://localhost:8080/api/materials/download/${t.qualificationImageUrl}`}
+                                                                    alt="qualification"
+                                                                    style={{ maxWidth: '220px', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px', border: '1.5px solid #e2e8f0', cursor: 'pointer' }}
+                                                                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                />
+                                                            </a>
+                                                        </div>
+                                                    )}
+
+                                                    {t.verificationStatus === 'PENDING' && (
+                                                        <div className="reg-actions" style={{ marginTop: '12px' }}>
+                                                            <button className="btn-sm btn-primary"
+                                                                onClick={() => reviewTutor(t.tutorProfileId, 'APPROVED')}>
+                                                                ✅ Duyệt hồ sơ
+                                                            </button>
+                                                            <button className="btn-sm btn-danger"
+                                                                onClick={() => { setRejectReasonModal({ open: true, id: t.tutorProfileId }); setRejectReasonText(''); }}>
+                                                                ❌ Từ chối
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </>
                     )}
                 </main>
             </div>
+
+            {/* MODAL TỪ CHỐI HỒ SƠ GIA SƯ */}
+            {rejectReasonModal.open && (
+                <div className="modal-overlay" onClick={() => setRejectReasonModal({ open: false, id: null })}>
+                    <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                        <h3>❌ Từ chối hồ sơ gia sư</h3>
+                        <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                            Nhập lý do để gia sư biết và cải thiện hồ sơ.
+                        </p>
+                        <div className="modal-form">
+                            <label>Lý do từ chối *</label>
+                            <textarea className="modal-input" rows={3}
+                                value={rejectReasonText}
+                                onChange={e => setRejectReasonText(e.target.value)}
+                                placeholder="VD: Ảnh bằng cấp không rõ, thiếu thông tin chuyên môn..." />
+                        </div>
+                        <div className="modal-actions">
+                            <button className="btn-danger"
+                                onClick={() => rejectReasonModal.id && reviewTutor(rejectReasonModal.id, 'REJECTED', rejectReasonText)}
+                                disabled={!rejectReasonText.trim()}>
+                                ❌ Xác nhận từ chối
+                            </button>
+                            <button className="btn-outline" onClick={() => setRejectReasonModal({ open: false, id: null })}>Hủy</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL CHUYỂN TIỀN + UPLOAD MINH CHỨNG */}
             {transferModal.open && transferModal.payment && (

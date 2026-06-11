@@ -42,5 +42,12 @@ public class TutorProfileResponse {
 
     // Điểm uy tín (0-100)
     private int reputationScore;
-    private String reputationLabel; // "Xuất sắc" / "Tốt" / "Trung bình" / "Cần cải thiện"
+    private String reputationLabel;
+
+    // Bằng cấp / chứng chỉ
+    private String qualificationImageUrl;
+
+    // Trạng thái duyệt hồ sơ
+    private String verificationStatus; // NONE | PENDING | APPROVED | REJECTED
+    private String verificationNote;
 }

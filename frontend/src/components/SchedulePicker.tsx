@@ -21,7 +21,6 @@ const DAYS = [
     { key: 'SUN', label: 'CN' },
 ];
 
-// Các khung giờ phổ biến cho gia sư
 const TIME_OPTIONS = [
     '06:00', '07:00', '07:30', '08:00', '08:30',
     '09:00', '09:30', '10:00', '13:00', '13:30',
@@ -31,19 +30,22 @@ const TIME_OPTIONS = [
 ];
 
 export default function SchedulePicker({ value, onChange }: Props) {
-    // Ngày đang được chọn để set giờ
     const [activeDay, setActiveDay] = useState<string | null>(null);
-
     const selectedDays = value.map(s => s.day);
 
     const toggleDay = (dayKey: string) => {
         if (selectedDays.includes(dayKey)) {
-            // Bỏ chọn ngày này
             onChange(value.filter(s => s.day !== dayKey));
             if (activeDay === dayKey) setActiveDay(null);
         } else {
-            // Chọn ngày, thêm slot mặc định 19:00-21:00
-            onChange([...value, { day: dayKey, startTime: '19:00', endTime: '21:00' }]);
+            // Copy giờ từ slot cuối cùng đã chọn, nếu không có thì dùng mặc định
+            const lastSlot = value.length > 0 ? value[value.length - 1] : null;
+            const newSlot: ScheduleSlot = {
+                day: dayKey,
+                startTime: lastSlot ? lastSlot.startTime : '19:00',
+                endTime:   lastSlot ? lastSlot.endTime   : '21:00',
+            };
+            onChange([...value, newSlot]);
             setActiveDay(dayKey);
         }
     };
@@ -66,21 +68,19 @@ export default function SchedulePicker({ value, onChange }: Props) {
                             key={d.key}
                             type="button"
                             onClick={() => {
-                                toggleDay(d.key);
-                                if (!selected) setActiveDay(d.key);
-                                else if (isActive) setActiveDay(null);
-                                else setActiveDay(d.key);
+                                if (selected) {
+                                    toggleDay(d.key);
+                                } else {
+                                    toggleDay(d.key);
+                                    setActiveDay(d.key);
+                                }
                             }}
                             style={{
-                                flex: 1,
-                                padding: '8px 4px',
-                                borderRadius: '10px',
+                                flex: 1, padding: '8px 4px', borderRadius: '10px',
                                 border: `2px solid ${selected ? '#4f46e5' : '#e2e8f0'}`,
                                 background: selected ? '#4f46e5' : 'white',
                                 color: selected ? 'white' : '#64748b',
-                                fontWeight: 700,
-                                fontSize: '0.82rem',
-                                cursor: 'pointer',
+                                fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer',
                                 transition: 'all 0.15s',
                                 outline: isActive ? '3px solid #a5b4fc' : 'none',
                             }}
@@ -91,9 +91,11 @@ export default function SchedulePicker({ value, onChange }: Props) {
                 })}
             </div>
 
-            {/* Panel chỉnh giờ cho từng ngày đã chọn */}
+            {/* Panel chỉnh giờ — có scroll nếu nhiều ngày */}
             {value.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{
+                    display: 'flex', flexDirection: 'column', gap: '8px',
+                }}>
                     {DAYS.filter(d => selectedDays.includes(d.key)).map(d => {
                         const slot = getSlot(d.key)!;
                         const isActive = activeDay === d.key;
@@ -107,14 +109,13 @@ export default function SchedulePicker({ value, onChange }: Props) {
                                     border: `1.5px solid ${isActive ? '#6366f1' : '#e2e8f0'}`,
                                     borderRadius: '10px', padding: '10px 14px',
                                     cursor: 'pointer', transition: 'all 0.15s',
+                                    flexShrink: 0, // không bị nén
                                 }}
                             >
-                                {/* Tên ngày */}
                                 <span style={{ fontWeight: 700, color: '#4f46e5', minWidth: '28px', fontSize: '0.88rem' }}>
                                     {d.label}
                                 </span>
 
-                                {/* Giờ bắt đầu */}
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
                                     <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px' }}>Bắt đầu</span>
                                     <select
@@ -129,7 +130,6 @@ export default function SchedulePicker({ value, onChange }: Props) {
 
                                 <span style={{ color: '#94a3b8', fontWeight: 600 }}>→</span>
 
-                                {/* Giờ kết thúc */}
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
                                     <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px' }}>Kết thúc</span>
                                     <select
@@ -142,7 +142,6 @@ export default function SchedulePicker({ value, onChange }: Props) {
                                     </select>
                                 </div>
 
-                                {/* Nút xóa */}
                                 <button
                                     type="button"
                                     onClick={e => { e.stopPropagation(); onChange(value.filter(s => s.day !== d.key)); if (activeDay === d.key) setActiveDay(null); }}

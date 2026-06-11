@@ -46,6 +46,11 @@ public class CourseService {
         TutorProfile tutor = tutorProfileRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Tutor profile not found"));
 
+        // Kiểm tra hồ sơ đã được Admin duyệt chưa
+        if (!"APPROVED".equals(tutor.getVerificationStatus())) {
+            throw new RuntimeException("Hồ sơ gia sư chưa được Admin duyệt. Vui lòng nộp hồ sơ xét duyệt trước.");
+        }
+
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() -> new RuntimeException("Subject not found"));
 
@@ -56,19 +61,17 @@ public class CourseService {
                 .totalSessions(request.getTotalSessions())
                 .tutor(tutor)
                 .subject(subject)
-                .status(CourseStatus.PENDING_APPROVE)
+                .status(CourseStatus.APPROVED) // Hồ sơ đã duyệt → khóa học tự động APPROVED
                 .isPromoted(false)
                 .teachingMode(request.getTeachingMode() != null ? request.getTeachingMode() : "BOTH")
                 .schedule(request.getSchedule())
                 .build();
 
         Course savedCourse = courseRepository.save(course);
+        sessionService.initializeSessions(savedCourse); // Tạo buổi học ngay
         notificationService.createNotification(user,
-                "Khóa học '" + savedCourse.getTitle() + "' đã tạo, đang chờ Admin duyệt.",
+                "✅ Khóa học '" + savedCourse.getTitle() + "' đã được tạo và hiển thị ngay trên hệ thống.",
                 "/tutor?tab=courses");
-        notificationService.notifyAdmins(
-                "📚 Gia sư " + user.getFullName() + " vừa tạo khóa học mới '" + savedCourse.getTitle() + "'. Cần duyệt.",
-                "/admin?tab=courses");
         return mapToResponse(savedCourse);
     }
 
@@ -256,9 +259,10 @@ public class CourseService {
         Double avgRating = reviewRepository.getAvgRatingByCourseId(course.getId());
         // Chỉ đếm học viên đang học (ACTIVE) — không đếm PENDING/REJECTED/COMPLETED
         long totalRegistrations = registrationRepository.countByCourseIdAndStatus(course.getId(), "ACTIVE");
-        // Lớp đầy khi có học viên ACTIVE (đang học) hoặc APPROVED mà hóa đơn còn hạn
+        // Lớp đầy / đã được dạy khi có học viên ACTIVE, APPROVED còn hạn, hoặc COMPLETED
         long approvedCount = registrationRepository.findByCourseId(course.getId()).stream()
                 .filter(r -> "ACTIVE".equals(r.getStatus())
+                        || "COMPLETED".equals(r.getStatus())
                         || ("APPROVED".equals(r.getStatus()) && !isRegistrationInvoiceExpired(r)))
                 .count();
         double score = calculateScore(course, avgRating, totalRegistrations);

@@ -45,4 +45,20 @@ public class ProfileController {
             Authentication auth) {
         return ResponseEntity.ok(profileService.uploadTutorAvatar(auth.getName(), file));
     }
+
+    @PostMapping("/tutor/qualification")
+    public ResponseEntity<?> uploadQualification(
+            @RequestParam("file") MultipartFile file,
+            Authentication auth) {
+        return ResponseEntity.ok(profileService.uploadTutorQualification(auth.getName(), file));
+    }
+
+    /** Gia sư nộp hồ sơ xét duyệt: upload bằng cấp + ghi lời nhắn */
+    @PostMapping("/tutor/submit-verification")
+    public ResponseEntity<?> submitVerification(
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "note", required = false) String note,
+            Authentication auth) {
+        return ResponseEntity.ok(profileService.submitVerification(auth.getName(), file, note));
+    }
 }

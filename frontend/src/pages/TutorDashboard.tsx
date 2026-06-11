@@ -128,10 +128,12 @@ export default function TutorDashboard() {
     const [feeProofFile, setFeeProofFile] = useState<File | null>(null);
     const [feeMsg, setFeeMsg] = useState('');
     const [submittingFee, setSubmittingFee] = useState(false);
+    const [adminPayInfo, setAdminPayInfo] = useState<{ bankName: string; bankAccount: string; bankOwner: string; qrImageUrl: string } | null>(null);
 
     useEffect(() => {
         fetchAll();
         api.get('/public/subjects').then(res => setSubjects(res.data)).catch(console.error);
+        api.get('/public/payment-info').then(res => setAdminPayInfo(res.data)).catch(console.error);
         // Lấy điểm uy tín từ profile
         api.get('/profile/me').then(res => {
             if (res.data.reputationScore !== undefined) {
@@ -677,7 +679,8 @@ export default function TutorDashboard() {
             {/* MODAL TẠO/SỬA KHÓA HỌC */}
             {courseModal.open && (
                 <div className="modal-overlay" onClick={() => setCourseModal({ open: false, editing: null })}>
-                    <div className="modal-box" onClick={e => e.stopPropagation()}>
+                    <div className="modal-box" onClick={e => e.stopPropagation()}
+                        style={{ maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                         <h3>{courseModal.editing ? '✏️ Sửa khóa học' : '➕ Tạo khóa học mới'}</h3>
                         <div className="modal-form">
                             <label>Tiêu đề *</label>
@@ -726,19 +729,73 @@ export default function TutorDashboard() {
             {/* MODAL PHÍ SÀN */}
             {feeModal && (
                 <div className="modal-overlay" onClick={() => setFeeModal(false)}>
-                    <div className="modal-box" onClick={e => e.stopPropagation()}>
-                        <h3>💵 Nộp phí sàn</h3>
-                        <p style={{ color: '#64748b', marginBottom: '1rem' }}>
-                            Chuyển khoản <strong>200.000đ</strong> theo thông tin hợp đồng, sau đó chọn ảnh minh chứng:
+                    <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+                        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                            <div style={{ fontSize: '2rem', marginBottom: '4px' }}>💵</div>
+                            <h3 style={{ margin: 0, color: '#92400e' }}>Nộp phí sàn — 200.000đ</h3>
+                            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '6px 0 0' }}>
+                                Nộp một lần để kích hoạt tài khoản và tạo khóa học
+                            </p>
+                        </div>
+
+                        {/* QR */}
+                        {adminPayInfo?.qrImageUrl && (
+                            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                                <img
+                                    src={`http://localhost:8080/api/materials/download/${adminPayInfo.qrImageUrl}`}
+                                    alt="QR chuyển khoản"
+                                    style={{ width: 180, height: 180, objectFit: 'contain', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Thông tin tài khoản */}
+                        {adminPayInfo?.bankAccount && (
+                            <div style={{ background: '#f0f7ff', border: '1.5px solid #bfdbfe', borderRadius: '12px', padding: '12px 16px', marginBottom: '1rem', fontSize: '0.88rem' }}>
+                                <p style={{ fontWeight: 700, color: '#1e40af', margin: '0 0 8px' }}>🏦 Thông tin tài khoản</p>
+                                <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '6px 8px', color: '#374151' }}>
+                                    <span style={{ color: '#64748b' }}>Ngân hàng:</span><strong>{adminPayInfo.bankName}</strong>
+                                    <span style={{ color: '#64748b' }}>Số TK:</span><strong style={{ color: '#005BAA', fontSize: '1rem', letterSpacing: '1px' }}>{adminPayInfo.bankAccount}</strong>
+                                    <span style={{ color: '#64748b' }}>Chủ TK:</span><strong>{adminPayInfo.bankOwner}</strong>
+                                    <span style={{ color: '#64748b' }}>Số tiền:</span><strong style={{ color: '#005BAA' }}>200.000đ</strong>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Nội dung chuyển khoản */}
+                        {(() => {
+                            const content = `PhiSan ${user?.fullName?.replace(/\s+/g, '') || 'GiaSu'}`;
+                            return (
+                                <div style={{ background: '#fff7ed', border: '2px solid #fed7aa', borderRadius: '12px', padding: '10px 14px', marginBottom: '1rem' }}>
+                                    <p style={{ fontSize: '0.82rem', color: '#92400e', fontWeight: 600, margin: '0 0 6px' }}>
+                                        ⚠️ Nội dung chuyển khoản (bắt buộc)
+                                    </p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <code style={{ flex: 1, background: 'white', border: '1.5px solid #fed7aa', borderRadius: '8px', padding: '8px 12px', fontSize: '0.95rem', fontWeight: 700, color: '#ef4444' }}>
+                                            {content}
+                                        </code>
+                                        <button onClick={() => navigator.clipboard.writeText(content)}
+                                            style={{ background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}>
+                                            📋 Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Upload minh chứng */}
+                        <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                            📤 Sau khi chuyển khoản, nộp ảnh minh chứng:
                         </p>
                         <input type="file" accept="image/*,.pdf"
                             onChange={e => setFeeProofFile(e.target.files?.[0] || null)}
                             style={{ padding: '8px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' }} />
                         {feeProofFile && <p style={{ fontSize: '0.82rem', color: '#10b981', marginTop: '4px' }}>✅ Đã chọn: {feeProofFile.name}</p>}
-                        {feeMsg && <p style={{ color: feeMsg.startsWith('✅') ? '#10b981' : '#ef4444', marginTop: '8px' }}>{feeMsg}</p>}
+                        {feeMsg && <p style={{ color: feeMsg.startsWith('✅') ? '#10b981' : '#ef4444', marginTop: '8px', fontSize: '0.88rem' }}>{feeMsg}</p>}
+
                         <div className="modal-actions">
-                            <button className="btn-primary" onClick={submitFee} disabled={submittingFee}>
-                                {submittingFee ? '⏳ Đang gửi...' : 'Gửi yêu cầu'}
+                            <button className="btn-primary" onClick={submitFee} disabled={submittingFee || !feeProofFile}>
+                                {submittingFee ? '⏳ Đang gửi...' : '📤 Nộp minh chứng'}
                             </button>
                             <button className="btn-outline" onClick={() => { setFeeModal(false); setFeeProofFile(null); setFeeMsg(''); }}>Hủy</button>
                         </div>

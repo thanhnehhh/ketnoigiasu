@@ -51,22 +51,17 @@ api.interceptors.response.use(
             console.warn('[401] URL bị từ chối:', url, '| message:', message);
 
             const isPublic = url.includes('/public/') || url.includes('/auth/') || url.includes('/otp/');
+            const hasToken = !!localStorage.getItem('token');
 
-            // Chỉ redirect khi token thực sự hết hạn (message chứa "expired" hoặc token invalid)
-            // KHÔNG redirect khi lỗi là "Full authentication is required" do Spring Security
-            // vì đó có thể là lỗi permission tạm thời, không phải token hết hạn
-            const isExpiredToken = isTokenExpired()
-                || (typeof message === 'string' && (
-                    message.toLowerCase().includes('expired')
-                    || message.toLowerCase().includes('invalid token')
-                    || message.toLowerCase().includes('jwt')
-                ));
-
-            if (!isPublic && !redirecting && isExpiredToken) {
+            // Clear token nếu:
+            // 1. Token đã hết hạn theo thời gian
+            // 2. Hoặc có token nhưng server không nhận (user bị xóa, token invalid...)
+            // Không redirect nếu là public endpoint
+            if (!isPublic && !redirecting && hasToken) {
                 redirecting = true;
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+                toast.error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
                 setTimeout(() => { redirecting = false; window.location.replace('/login'); }, 1500);
             }
         }
