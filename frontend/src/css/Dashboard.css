@@ -363,6 +363,8 @@
     padding: 2rem;
     width: 100%;
     max-width: 480px;
+    max-height: 90vh;      /* không vượt quá 90% chiều cao màn hình */
+    overflow-y: auto;      /* scroll bên trong nếu nội dung dài */
     box-shadow: 0 20px 60px rgba(0,0,0,0.2);
 }
 .modal-box h3 {

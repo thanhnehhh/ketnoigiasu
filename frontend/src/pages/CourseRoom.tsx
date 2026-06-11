@@ -115,9 +115,9 @@ export default function CourseRoom() {
         }
     }, [authLoading, user, courseId]);
 
-    // Fetch danh sách học viên ACTIVE khi tutor mở tab báo cáo phụ huynh
+    // Fetch activeStudents khi tab parent-report hoặc khi fetchAll xong
     useEffect(() => {
-        if (!authLoading && isTutor && tab === 'parent-report' && courseId) {
+        if (!authLoading && isTutor && courseId) {
             api.get(`/tutor/activities/course/${courseId}/students`)
                 .then(res => {
                     setActiveStudents(res.data);
@@ -125,7 +125,7 @@ export default function CourseRoom() {
                 })
                 .catch(console.error);
         }
-    }, [tab, isTutor, courseId, authLoading]);
+    }, [authLoading, isTutor, courseId]); // Bỏ điều kiện tab — fetch ngay khi load
 
     const fetchAll = async () => {
         if (!user || !courseId) return;
@@ -173,9 +173,11 @@ export default function CourseRoom() {
     const saveSchedule = async () => {
         if (!scheduleModal.session) return;
         try {
-            // Chuyển datetime-local sang ISO format
+            // datetime-local trả về "2026-06-10T19:00" — cần thêm ":00" để backend parse đúng
             const startTime = scheduleForm.startTime
-                ? scheduleForm.startTime.replace('T', 'T') // đã đúng format
+                ? scheduleForm.startTime.length === 16
+                    ? scheduleForm.startTime + ':00'   // "2026-06-10T19:00" → "2026-06-10T19:00:00"
+                    : scheduleForm.startTime
                 : null;
             await api.put(`/tutor/activities/session/${scheduleModal.session.id}/schedule`, {
                 title: scheduleModal.session.title,
@@ -476,8 +478,9 @@ export default function CourseRoom() {
                                         {sessions.map((s, idx) => {
                                             const prevNotDone = idx > 0 && !sessions[idx - 1].isCompleted;
                                             const now = new Date();
-                                            const startDate = s.startTime ? new Date(s.startTime) : null;
-                                            const isPast = startDate ? now > startDate : false;
+                                            // startTime có thể là "" (empty) khi chưa lên lịch
+                                            const startDate = s.startTime && s.startTime.trim() !== '' ? new Date(s.startTime) : null;
+                                            const isPast = startDate && !isNaN(startDate.getTime()) ? now > startDate : false;
 
                                             const getStatus = () => {
                                                 if (s.isCompleted && s.studentConfirmed)
@@ -664,7 +667,7 @@ export default function CourseRoom() {
                                                                         return (
                                                                             <>
                                                                                 <button className="cr-btn-outline"
-                                                                                    onClick={() => { setScheduleModal({ open: true, session: s }); setScheduleForm({ onlineLink: s.onlineLink || '', startTime: s.startTime.slice(0, 16) }); }}>
+                                                                                    onClick={() => { setScheduleModal({ open: true, session: s }); setScheduleForm({ onlineLink: s.onlineLink || '', startTime: (s.startTime && s.startTime.trim() !== '') ? s.startTime.slice(0, 16) : '' }); }}>
                                                                                     ✏️ Sửa lịch
                                                                                 </button>
                                                                                 <span className="cr-lock-hint">
@@ -710,54 +713,78 @@ export default function CourseRoom() {
                         {/* ===== TAB: BÁO CÁO PH (TUTOR) ===== */}
                         {tab === 'parent-report' && isTutor && (
                             <div className="cr-parent-report-box">
-                                <h2>📊 Gửi báo cáo học tập cho phụ huynh</h2>
+                                <h2>📊 Báo cáo học tập cho phụ huynh</h2>
                                 <p className="cr-parent-report-desc">
-                                    Hệ thống sẽ tự động tổng hợp tiến độ học tập (số buổi hoàn thành, nhật ký từng buổi)
-                                    và gửi email đến địa chỉ email đăng ký của học viên (dùng làm email phụ huynh).
+                                    Xem lại toàn bộ tiến độ và nhật ký học tập bên dưới. Khi sẵn sàng, bấm gửi để email báo cáo đến phụ huynh.
                                 </p>
 
                                 {activeStudents.length === 0 ? (
-                                    <div className="cr-empty">
-                                        <p>Chưa có học viên nào đang học (ACTIVE) trong lớp này.</p>
-                                        <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                                            Học viên cần được duyệt và thanh toán học phí để có trạng thái ACTIVE.
-                                        </p>
-                                    </div>
+                                    <div className="cr-empty"><p>Chưa có học viên nào trong lớp này.</p></div>
                                 ) : (
                                     <div className="cr-parent-report-form">
-                                        <div className="cr-form-group">
-                                            <label>Chọn học viên *</label>
-                                            <select
-                                                className="cr-select"
-                                                value={selectedRegId ?? ''}
-                                                onChange={e => setSelectedRegId(Number(e.target.value))}
-                                            >
-                                                {activeStudents.map(s => (
-                                                    <option key={s.registrationId} value={s.registrationId}>
-                                                        {s.studentName} ({s.studentEmail})
-                                                    </option>
-                                                ))}
-                                            </select>
+                                        {/* Thông tin học viên nhận báo cáo */}
+                                        {activeStudents.map(s => (
+                                            <div key={s.registrationId} style={{ background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: '12px', padding: '12px 16px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <span style={{ fontSize: '1.5rem' }}>🎓</span>
+                                                <div>
+                                                    <div style={{ fontWeight: 700, color: '#0369a1' }}>{s.studentName}</div>
+                                                    <div style={{ fontSize: '0.82rem', color: '#64748b' }}>📧 Báo cáo sẽ gửi đến: <strong>{s.studentEmail}</strong></div>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Tiến độ */}
+                                        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px', marginBottom: '1rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                <span style={{ fontWeight: 700, color: '#1f2937' }}>📈 Tiến độ học tập</span>
+                                                <span style={{ fontWeight: 800, color: '#4f46e5' }}>{completedCount}/{totalCount} buổi ({progressPct}%)</span>
+                                            </div>
+                                            <div style={{ height: '10px', background: '#e2e8f0', borderRadius: '20px', overflow: 'hidden' }}>
+                                                <div style={{ height: '100%', width: `${progressPct}%`, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', borderRadius: '20px' }} />
+                                            </div>
                                         </div>
 
-                                        <div className="cr-form-group">
-                                            <label>Nhận xét thêm của gia sư (tùy chọn)</label>
+                                        {/* Nhật ký từng buổi */}
+                                        <div style={{ marginBottom: '1rem' }}>
+                                            <p style={{ fontWeight: 700, color: '#374151', marginBottom: '8px' }}>📝 Nhật ký từng buổi học:</p>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                                                {sessions.map(s => (
+                                                    <div key={s.id} style={{
+                                                        background: s.isCompleted ? '#f0fdf4' : '#fafafa',
+                                                        border: `1px solid ${s.isCompleted ? '#bbf7d0' : '#e2e8f0'}`,
+                                                        borderRadius: '10px', padding: '10px 14px',
+                                                    }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1f2937' }}>{s.title}</span>
+                                                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: s.isCompleted ? '#059669' : '#94a3b8' }}>
+                                                                {s.isCompleted ? '✅ Hoàn thành' : '⏳ Chưa học'}
+                                                            </span>
+                                                        </div>
+                                                        {s.isCompleted && s.notes && (
+                                                            <p style={{ margin: '6px 0 0', fontSize: '0.82rem', color: '#374151' }}>
+                                                                📝 {s.notes}
+                                                            </p>
+                                                        )}
+                                                        {s.startTime && s.startTime.trim() !== '' && (
+                                                            <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                                                                🕐 {new Date(s.startTime).toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Nhận xét thêm */}
+                                        <div className="cr-form-group" style={{ marginBottom: '1rem' }}>
+                                            <label>💬 Nhận xét thêm <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.82rem' }}>(tùy chọn — sẽ hiển thị trong email)</span></label>
                                             <textarea
-                                                rows={4}
+                                                rows={3}
                                                 className="cr-textarea"
                                                 value={parentReportNote}
                                                 onChange={e => setParentReportNote(e.target.value)}
                                                 placeholder="Ví dụ: Con học rất chăm chỉ, tiến bộ rõ rệt. Cần ôn thêm phần đạo hàm..."
                                             />
-                                        </div>
-
-                                        <div className="cr-parent-report-preview">
-                                            <h4>📋 Nội dung báo cáo sẽ bao gồm:</h4>
-                                            <ul>
-                                                <li>✅ Tiến độ học tập: <strong>{completedCount}/{totalCount} buổi ({progressPct}%)</strong></li>
-                                                <li>📅 Chi tiết từng buổi học và nhật ký gia sư</li>
-                                                <li>💬 Nhận xét thêm của gia sư (nếu có)</li>
-                                            </ul>
                                         </div>
 
                                         {parentReportMsg && (
@@ -768,10 +795,15 @@ export default function CourseRoom() {
 
                                         <button
                                             className="cr-btn-send-report"
-                                            onClick={sendParentReport}
+                                            onClick={() => {
+                                                if (!selectedRegId && activeStudents.length > 0) {
+                                                    setSelectedRegId(activeStudents[0].registrationId);
+                                                }
+                                                sendParentReport();
+                                            }}
                                             disabled={sendingReport}
                                         >
-                                            {sendingReport ? '⏳ Đang gửi...' : '📧 Gửi báo cáo cho phụ huynh'}
+                                            {sendingReport ? '⏳ Đang gửi...' : '📧 Gửi báo cáo đến phụ huynh'}
                                         </button>
                                     </div>
                                 )}

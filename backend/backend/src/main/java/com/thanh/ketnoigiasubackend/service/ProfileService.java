@@ -25,6 +25,7 @@ public class ProfileService {
     private final StudentProfileRepository studentProfileRepository;
     private final TutorProfileRepository tutorProfileRepository;
     private final FileStorageService fileStorageService;
+    private final NotificationService notificationService;
 
     public Object getProfileByEmail(String email) {
         User user = userRepository.findByEmail(email)
@@ -67,6 +68,9 @@ public class ProfileService {
                 .teachingMode(tutor.getTeachingMode())
                 .reputationScore(tutor.getReputationScore())
                 .reputationLabel(ReputationService.getLabel(tutor.getReputationScore()))
+                .qualificationImageUrl(tutor.getQualificationImageUrl())
+                .verificationStatus(tutor.getVerificationStatus())
+                .verificationNote(tutor.getVerificationNote())
                 .build();
     }
 
@@ -147,5 +151,45 @@ public class ProfileService {
         profile.setAvatarUrl(savedName);
         tutorProfileRepository.save(profile);
         return Map.of("avatarUrl", savedName);
+    }
+
+    @Transactional
+    public Map<String, String> uploadTutorQualification(String email, MultipartFile file) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        TutorProfile profile = tutorProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Profile not found"));
+        String savedName = fileStorageService.save(file);
+        profile.setQualificationImageUrl(savedName);
+        tutorProfileRepository.save(profile);
+        return Map.of("qualificationImageUrl", savedName);
+    }
+
+    @Transactional
+    public Map<String, String> submitVerification(String email, MultipartFile file, String note) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        TutorProfile profile = tutorProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Profile not found"));
+
+        if ("APPROVED".equals(profile.getVerificationStatus()))
+            throw new RuntimeException("Hồ sơ của bạn đã được duyệt rồi!");
+
+        // Upload ảnh bằng cấp nếu có
+        if (file != null && !file.isEmpty()) {
+            String savedName = fileStorageService.save(file);
+            profile.setQualificationImageUrl(savedName);
+        }
+
+        profile.setVerificationStatus("PENDING");
+        if (note != null && !note.isBlank()) profile.setVerificationNote(note);
+        tutorProfileRepository.save(profile);
+
+        // Thông báo Admin
+        notificationService.notifyAdmins(
+                "📋 Gia sư " + user.getFullName() + " vừa nộp hồ sơ xét duyệt.",
+                "/admin?tab=tutors"
+        );
+        return Map.of("status", "PENDING", "message", "Đã nộp hồ sơ! Admin sẽ xét duyệt sớm.");
     }
 }

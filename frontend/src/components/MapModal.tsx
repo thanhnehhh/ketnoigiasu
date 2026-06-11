@@ -209,7 +209,7 @@ export default function MapModal({ studentName, studentAddress, tutorAddress, on
                 mapInst.current=null;
             }
         };
-    }, []); 
+    }, []);
     const inR = distStraight !== null && distStraight <= radius;
 
     return (

@@ -57,6 +57,15 @@ public class TutorProfile {
     // Ảnh đại diện (lưu đường dẫn file upload)
     private String avatarUrl;
 
+    // Ảnh bằng cấp/chứng chỉ (lưu đường dẫn file upload)
+    private String qualificationImageUrl;
+
+    // Trạng thái duyệt hồ sơ gia sư
+    // PENDING: chờ duyệt | APPROVED: đã duyệt | REJECTED: bị từ chối | NONE: chưa nộp
+    @Builder.Default
+    private String verificationStatus = "NONE";
+    private String verificationNote;    // lời nhắn của gia sư khi nộp / lý do Admin từ chối
+
     // Điểm uy tín (0 - 100), mặc định 50 khi mới tạo
     @Builder.Default
     @Column(nullable = false)

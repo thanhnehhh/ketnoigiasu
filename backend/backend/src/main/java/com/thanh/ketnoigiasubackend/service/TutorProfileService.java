@@ -88,6 +88,9 @@ public class TutorProfileService {
                 .teachingMode(tutor.getTeachingMode())
                 .reputationScore(tutor.getReputationScore())
                 .reputationLabel(ReputationService.getLabel(tutor.getReputationScore()))
+                .qualificationImageUrl(tutor.getQualificationImageUrl())
+                .verificationStatus(tutor.getVerificationStatus())
+                .verificationNote(tutor.getVerificationNote())
                 .courses(courses)
                 .build();
     }
