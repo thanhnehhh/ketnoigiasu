@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
 
                         .requestMatchers("/api/auth/**", "/api/otp/**", "/api/public/**").permitAll()
+                        .requestMatchers("/api/ai/**").permitAll()
                         .requestMatchers("/api/payments/vnpay/verify").permitAll()
                         .requestMatchers("/api/admin/payment-info/qr").hasRole("ADMIN")
                         .requestMatchers("/api/admin/platform-fee").hasRole("ADMIN")

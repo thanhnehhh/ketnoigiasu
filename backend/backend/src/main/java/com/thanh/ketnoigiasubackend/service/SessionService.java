@@ -181,7 +181,7 @@ public class SessionService {
                 .build();
     }
 
-    /** Học viên gửi phản hồi cho buổi học đã hoàn thành */
+    // Học viên gửi phản hồi cho buổi học đã hoàn thành
     @Transactional
     public SessionResponse submitStudentFeedback(Long sessionId, String feedback, String studentEmail) {
         CourseSession session = sessionRepository.findById(sessionId)
@@ -192,11 +192,9 @@ public class SessionService {
         return mapToResponse(sessionRepository.save(session));
     }
 
-    /**
-     * Học viên xác nhận đã học buổi này.
-     * Gọi sau khi gia sư đã ghi nhật ký (isCompleted = true).
-     * Nếu đây là buổi cuối → trigger auto-complete khóa học.
-     */
+    // Học viên xác nhận đã học buổi này.
+    // Gọi sau khi gia sư đã ghi nhật ký (isCompleted = true).
+    // Nếu đây là buổi cuối → trigger auto-complete khóa học.
     @Transactional
     public SessionResponse studentConfirmSession(Long sessionId, String studentEmail) {
         CourseSession session = sessionRepository.findById(sessionId)
@@ -227,10 +225,8 @@ public class SessionService {
         return mapToResponse(saved);
     }
 
-    /**
-     * Học viên phản đối buổi học (nghi ngờ gia sư không dạy thực sự).
-     * Admin sẽ xem xét và xử lý thủ công.
-     */
+    // Học viên phản đối buổi học (nghi ngờ gia sư không dạy thực sự).
+    // Admin sẽ xem xét và xử lý thủ công.
     @Transactional
     public SessionResponse studentDisputeSession(Long sessionId, String reason, String studentEmail) {
         CourseSession session = sessionRepository.findById(sessionId)
@@ -266,10 +262,8 @@ public class SessionService {
         return mapToResponse(saved);
     }
 
-    /**
-     * Tự động xác nhận các buổi đã quá 48h mà học viên chưa xác nhận.
-     * Gọi từ scheduled job hoặc trigger thủ công.
-     */
+    // Tự động xác nhận các buổi đã quá 48h mà học viên chưa xác nhận.
+    // Gọi từ scheduled job hoặc trigger thủ công.
     @Transactional
     public void autoConfirmExpiredSessions() {
         LocalDateTime deadline = LocalDateTime.now().minusHours(48);
@@ -302,10 +296,8 @@ public class SessionService {
 
     // ======== PRIVATE HELPERS ========
 
-    /**
-     * Kiểm tra và hoàn thành khóa học khi học viên xác nhận buổi cuối.
-     * Điều kiện: tất cả buổi phải có isCompleted=true VÀ studentConfirmed=true
-     */
+    // Kiểm tra và hoàn thành khóa học khi học viên xác nhận buổi cuối.
+    // Điều kiện: tất cả buổi phải có isCompleted=true VÀ studentConfirmed=true
     private void tryAutoCompleteForStudent(Course course, String studentEmail) {
         List<CourseSession> allSessions = sessionRepository.findByCourseIdOrderBySessionOrderAsc(course.getId());
         boolean allConfirmed = allSessions.stream().allMatch(s -> s.isCompleted() && s.isStudentConfirmed());

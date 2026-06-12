@@ -19,14 +19,14 @@ public class MessageService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
 
-    /** Lấy toàn bộ tin nhắn của lớp học */
+    // Lấy toàn bộ tin nhắn của lớp học
     @Transactional(readOnly = true)
     public List<MessageResponse> getMessages(Long courseId) {
         return messageRepository.findByCourseIdOrderByCreatedAtAsc(courseId)
                 .stream().map(this::toResponse).toList();
     }
 
-    /** Gửi tin nhắn text hoặc bài tập */
+    // Gửi tin nhắn text hoặc bài tập
     @Transactional
     public MessageResponse sendText(Long courseId, String senderEmail, String content, String type) {
         Course course = courseRepository.findById(courseId)
@@ -44,7 +44,7 @@ public class MessageService {
         return toResponse(messageRepository.save(msg));
     }
 
-    /** Gửi file/tài liệu */
+    // Gửi file/tài liệu
     @Transactional
     public MessageResponse sendFile(Long courseId, String senderEmail, String title, MultipartFile file) {
         Course course = courseRepository.findById(courseId)

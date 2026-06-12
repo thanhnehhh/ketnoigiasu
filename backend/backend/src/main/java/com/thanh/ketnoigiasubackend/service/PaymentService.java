@@ -138,14 +138,14 @@ public class PaymentService {
         return paymentRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream().map(this::mapToResponse).toList();
     }
 
-    /** Lấy danh sách học phí chưa chuyển tiền cho gia sư */
+    // Lấy danh sách học phí chưa chuyển tiền cho gia sư
     @Transactional(readOnly = true)
     public List<PaymentResponse> getPendingTransferToTutor() {
         return paymentRepository.findPendingTransferToTutor()
                 .stream().map(this::mapToResponse).toList();
     }
 
-    /** Admin đánh dấu đã chuyển tiền cho gia sư */
+    // Admin đánh dấu đã chuyển tiền cho gia sư
     @Transactional
     public PaymentResponse markTransferredToTutor(Long paymentId, String transferProofUrl) {
         Payment payment = paymentRepository.findById(paymentId)
@@ -176,7 +176,7 @@ public class PaymentService {
         return mapToResponse(paymentRepository.save(payment));
     }
 
-    /** Lịch sử đã chuyển tiền cho gia sư */
+    // Lịch sử đã chuyển tiền cho gia sư
     @Transactional(readOnly = true)
     public List<PaymentResponse> getTransferHistory() {
         return paymentRepository.findAll().stream()
@@ -186,7 +186,7 @@ public class PaymentService {
                 .toList();
     }
 
-    /** Thống kê tài chính tổng quan cho Admin */
+    // Thống kê tài chính tổng quan cho Admin
     @Transactional(readOnly = true)
     public Map<String, Object> getAdminFinanceSummary() {
         // Dùng query tổng hợp thay vì findAll() để tránh load toàn bộ bảng
@@ -234,7 +234,7 @@ public class PaymentService {
         return paymentRepository.existsByUserIdAndPaymentTypeAndStatus(userId, "PLATFORM_FEE", PaymentStatus.SUCCESS);
     }
 
-    /** Tóm tắt tài chính cho gia sư */
+    // Tóm tắt tài chính cho gia sư
     @Transactional(readOnly = true)
     public Map<String, Object> getTutorPaymentSummary(String email) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
@@ -268,7 +268,7 @@ public class PaymentService {
         return result;
     }
 
-    /** Lịch sử học phí học viên đã trả cho gia sư */
+    // Lịch sử học phí học viên đã trả cho gia sư
     @Transactional(readOnly = true)
     public List<PaymentResponse> getTutorIncomeHistory(String email) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
@@ -278,7 +278,7 @@ public class PaymentService {
                 .stream().map(this::mapToResponse).toList();
     }
 
-    /** Cập nhật thông tin tài khoản thụ hưởng */
+    // Cập nhật thông tin tài khoản thụ hưởng
     @Transactional
     public void updateBankInfo(String email, String bankName, String bankAccount, String bankOwner) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
@@ -321,7 +321,7 @@ public class PaymentService {
                 .build();
     }
 
-    /** ZaloPay thanh toán thành công → tự động duyệt hóa đơn, kích hoạt lớp học */
+    // ZaloPay thanh toán thành công → tự động duyệt hóa đơn, kích hoạt lớp học
     @Transactional
     public void autoApproveByZaloPay(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId).orElse(null);
@@ -349,7 +349,7 @@ public class PaymentService {
         }
     }
 
-    /** VNPay thanh toán thành công → tự động duyệt hóa đơn, kích hoạt lớp học */
+    // VNPay thanh toán thành công → tự động duyệt hóa đơn, kích hoạt lớp học
     @Transactional
     public void autoApproveByVNPay(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId).orElse(null);

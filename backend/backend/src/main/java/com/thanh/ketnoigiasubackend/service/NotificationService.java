@@ -18,13 +18,13 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
 
-    /** Tạo thông báo không có link */
+    // Tạo thông báo không có link
     @Transactional
     public void createNotification(User user, String message) {
         createNotification(user, message, null);
     }
 
-    /** Tạo thông báo có actionUrl — FE sẽ navigate đến URL này khi click */
+    // Tạo thông báo có actionUrl — FE sẽ navigate đến URL này khi click
     @Transactional
     public void createNotification(User user, String message, String actionUrl) {
         Notification notification = Notification.builder()
@@ -35,7 +35,7 @@ public class NotificationService {
         notificationRepository.save(notification);
     }
 
-    /** Gửi thông báo đến tất cả Admin */
+    // Gửi thông báo đến tất cả Admin
     @Transactional
     public void notifyAdmins(String message, String actionUrl) {
         userRepository.findByRole(Role.ADMIN).forEach(admin ->

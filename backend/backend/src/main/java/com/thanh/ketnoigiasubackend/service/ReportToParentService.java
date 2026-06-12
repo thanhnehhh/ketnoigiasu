@@ -16,14 +16,11 @@ public class ReportToParentService {
     private final UserRepository userRepository;
     private final EmailService emailService;
 
-    /**
-     * Gia sư gửi báo cáo học tập cho phụ huynh học viên.
-     * Email phụ huynh = email đăng ký tài khoản học viên (phone = SĐT phụ huynh).
-     *
-     * @param registrationId ID đăng ký lớp học
-     * @param tutorEmail     email gia sư (để xác thực quyền)
-     * @param extraNote      ghi chú thêm của gia sư
-     */
+    // Gia sư gửi báo cáo học tập cho phụ huynh học viên.
+    // Email phụ huynh = email đăng ký tài khoản học viên (phone = SĐT phụ huynh).
+    // @param registrationId ID đăng ký lớp học
+    // @param tutorEmail     email gia sư (để xác thực quyền)
+    // @param extraNote      ghi chú thêm của gia sư
     public void sendReportToParent(Long registrationId, String tutorEmail, String extraNote) {
         CourseRegistration reg = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp học"));

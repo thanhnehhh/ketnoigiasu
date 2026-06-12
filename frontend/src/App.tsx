@@ -22,6 +22,7 @@ import CourseDetail       from './pages/CourseDetail';
 import TutorPaymentPage   from './pages/TutorPaymentPage';
 import TutorList          from './pages/TutorList';
 import VNPayReturn        from './pages/VNPayReturn';
+import ChatbotWidget      from './components/ChatbotWidget';
 
 // Guard: chỉ cho vào nếu đã đăng nhập đúng role
 function RoleGuard({ role, children }: { role: string | string[]; children: ReactNode }) {
@@ -120,6 +121,7 @@ export default function App() {
                     }}
                 />
                 <AppRoutes />
+                <ChatbotWidget />
             </Router>
         </AuthProvider>
     );

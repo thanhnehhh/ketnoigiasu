@@ -75,7 +75,7 @@ public class ContractService {
         return mapToResponse(savedContract);
     }
 
-    /** Template hợp đồng mặc định cho nền tảng kết nối gia sư */
+    // Template hợp đồng mặc định cho nền tảng kết nối gia sư
     private String buildDefaultTemplate() {
         return """
             <div style="font-family:'Times New Roman',serif;font-size:13pt;line-height:1.8;color:#000;max-width:750px;margin:0 auto;padding:40px;">

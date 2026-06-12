@@ -66,7 +66,7 @@ public class RefundService {
         return mapToResponse(saved);
     }
 
-    /** Học viên xem lịch sử yêu cầu hoàn tiền của mình */
+    // Học viên xem lịch sử yêu cầu hoàn tiền của mình
     @Transactional(readOnly = true)
     public List<RefundRequestResponse> getMyRefundRequests(String studentEmail) {
         User student = userRepository.findByEmail(studentEmail)
@@ -75,14 +75,14 @@ public class RefundService {
                 .stream().map(this::mapToResponse).toList();
     }
 
-    /** Admin xem tất cả yêu cầu hoàn tiền đang chờ */
+    // Admin xem tất cả yêu cầu hoàn tiền đang chờ
     @Transactional(readOnly = true)
     public List<RefundRequestResponse> getPendingRefunds() {
         return refundRepository.findByStatusOrderByCreatedAtDesc("PENDING")
                 .stream().map(this::mapToResponse).toList();
     }
 
-    /** Admin duyệt / từ chối yêu cầu hoàn tiền */
+    // Admin duyệt / từ chối yêu cầu hoàn tiền
     @Transactional
     public RefundRequestResponse resolveRefund(Long refundId, String action, String adminNote) {
         RefundRequest refund = refundRepository.findById(refundId)
