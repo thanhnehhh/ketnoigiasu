@@ -68,10 +68,14 @@ public class CourseService {
                 .build();
 
         Course savedCourse = courseRepository.save(course);
-        sessionService.initializeSessions(savedCourse); // Tạo buổi học ngay
+        sessionService.initializeSessions(savedCourse);
         notificationService.createNotification(user,
                 "✅ Khóa học '" + savedCourse.getTitle() + "' đã được tạo và hiển thị ngay trên hệ thống.",
                 "/tutor?tab=courses");
+        // Thông báo Admin biết có khóa học mới
+        notificationService.notifyAdmins(
+                "📚 Gia sư " + user.getFullName() + " vừa tạo khóa học mới '" + savedCourse.getTitle() + "'.",
+                "/admin?tab=courses");
         return mapToResponse(savedCourse);
     }
 
@@ -227,7 +231,7 @@ public class CourseService {
                 });
     }
 
-    /** Kiểm tra đăng ký APPROVED có hóa đơn đã hết hạn không */
+    // Kiểm tra đăng ký APPROVED có hóa đơn đã hết hạn không
     private boolean isRegistrationInvoiceExpired(CourseRegistration reg) {
         return paymentRepository.findByUserIdOrderByCreatedAtDesc(reg.getStudent().getUser().getId())
                 .stream()

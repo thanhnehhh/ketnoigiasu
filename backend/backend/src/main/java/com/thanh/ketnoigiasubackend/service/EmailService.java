@@ -35,7 +35,7 @@ public class EmailService {
         }
     }
 
-    /** Gửi báo cáo học tập HTML cho phụ huynh */
+    // Gửi báo cáo học tập HTML cho phụ huynh
     @Async
     public void sendReportEmail(String toEmail, String subject, String htmlBody) {
         try {
@@ -54,7 +54,7 @@ public class EmailService {
         }
     }
 
-    /** Gửi thông báo từ gia sư đến học viên qua email */
+    // Gửi thông báo từ gia sư đến học viên qua email
     @Async
     public void sendAnnouncementEmail(String toEmail, String studentName, String courseTitle, String content) {
         try {

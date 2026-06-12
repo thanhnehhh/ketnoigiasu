@@ -5,7 +5,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import ChatBox from '../components/ChatBox';
+import { generateParentReport } from '../services/gemini';
 import '../css/CourseRoom.css';
 
 interface Session {
@@ -104,6 +104,8 @@ export default function CourseRoom() {
     const [parentReportMsg, setParentReportMsg] = useState('');
     const [parentReportErr, setParentReportErr] = useState(false);
     const [sendingReport, setSendingReport] = useState(false);
+    const [aiAnalyzing, setAiAnalyzing] = useState(false);
+    const [aiResult, setAiResult] = useState('');
 
     const isStudent = user?.role === 'STUDENT';
     const isTutor   = user?.role === 'TUTOR';
@@ -777,13 +779,59 @@ export default function CourseRoom() {
 
                                         {/* Nhận xét thêm */}
                                         <div className="cr-form-group" style={{ marginBottom: '1rem' }}>
-                                            <label>💬 Nhận xét thêm <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.82rem' }}>(tùy chọn — sẽ hiển thị trong email)</span></label>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                <label>💬 Nhận xét thêm <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.82rem' }}>(tùy chọn — sẽ hiển thị trong email)</span></label>
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        setAiAnalyzing(true);
+                                                        setAiResult('');
+                                                        try {
+                                                            const result = await generateParentReport({
+                                                                studentName: activeStudents[0]?.studentName || 'Học viên',
+                                                                courseTitle: registration?.courseTitle || 'Khóa học',
+                                                                tutorName: user?.fullName || 'Gia sư',
+                                                                completedCount,
+                                                                totalCount,
+                                                                sessions: sessions.map(s => ({
+                                                                    title: s.title,
+                                                                    notes: s.notes || '',
+                                                                    isCompleted: s.isCompleted,
+                                                                })),
+                                                                extraNote: parentReportNote,
+                                                            });
+                                                            setAiResult(result);
+                                                            setParentReportNote(result);
+                                                        } catch {
+                                                            toast.error('Gemini AI lỗi, thử lại sau');
+                                                        } finally {
+                                                            setAiAnalyzing(false);
+                                                        }
+                                                    }}
+                                                    disabled={aiAnalyzing}
+                                                    style={{
+                                                        background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                                                        color: 'white', border: 'none', borderRadius: '8px',
+                                                        padding: '5px 12px', cursor: 'pointer', fontSize: '0.82rem',
+                                                        fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px',
+                                                        opacity: aiAnalyzing ? 0.7 : 1,
+                                                    }}
+                                                >
+                                                    {aiAnalyzing ? '⏳ AI đang phân tích...' : '✨ Phân tích bằng AI'}
+                                                </button>
+                                            </div>
+                                            {aiResult && (
+                                                <div style={{ background: '#f5f3ff', border: '1.5px solid #c4b5fd', borderRadius: '8px', padding: '10px 14px', marginBottom: '8px', fontSize: '0.85rem', color: '#4c1d95' }}>
+                                                    <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: '0.78rem' }}>✨ Gemini AI đề xuất (đã điền vào ô bên dưới, bạn có thể chỉnh sửa):</p>
+                                                    <p style={{ margin: 0, fontStyle: 'italic' }}>{aiResult}</p>
+                                                </div>
+                                            )}
                                             <textarea
                                                 rows={3}
                                                 className="cr-textarea"
                                                 value={parentReportNote}
                                                 onChange={e => setParentReportNote(e.target.value)}
-                                                placeholder="Ví dụ: Con học rất chăm chỉ, tiến bộ rõ rệt. Cần ôn thêm phần đạo hàm..."
+                                                placeholder="Nhập thủ công hoặc bấm '✨ Phân tích bằng AI' để tự động sinh nhận xét..."
                                             />
                                         </div>
 

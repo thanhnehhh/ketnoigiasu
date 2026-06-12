@@ -22,9 +22,7 @@ public class ZaloPayService {
     private static final String CREATE_URL = "https://sb-openapi.zalopay.vn/v2/create";
     private static final String QUERY_URL  = "https://sb-openapi.zalopay.vn/v2/query";
 
-    /**
-     * Tạo đơn hàng ZaloPay
-     */
+    // Tạo đơn hàng ZaloPay
     public Map<String, Object> createOrder(Long paymentId, long amount,
                                             String studentName, String courseTitle) throws Exception {
         String appTransId = generateAppTransId(paymentId);
@@ -63,10 +61,8 @@ public class ZaloPayService {
         return result;
     }
 
-    /**
-     * Kiểm tra trạng thái đơn hàng (polling)
-     * return_code: 1 = thành công, 2 = thất bại, 3 = đang xử lý
-     */
+    // Kiểm tra trạng thái đơn hàng (polling)
+    // return_code: 1 = thành công, 2 = thất bại, 3 = đang xử lý
     public Map<String, Object> queryOrder(String appTransId) throws Exception {
         String rawMac = APP_ID + "|" + appTransId + "|" + KEY1;
         String mac = hmacSHA256(KEY1, rawMac);
@@ -128,7 +124,7 @@ public class ZaloPayService {
         return response.toString();
     }
 
-    /** Parse JSON đơn giản không cần thư viện */
+    // Parse JSON đơn giản không cần thư viện
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseJson(String json) {
         Map<String, Object> map = new LinkedHashMap<>();
